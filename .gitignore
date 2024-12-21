@@ -1,0 +1,45 @@
+# General
+*.log
+*.pyc
+*.pyo
+*.env
+__pycache__/
+*.sqlite3
+.DS_Store
+*.tmp
+
+# Python Virtual Environment
+venv/
+env/
+*.egg-info/
+
+# Django Specific
+db.sqlite3
+media/
+staticfiles/
+
+# Secret Key and Config Files
+.env
+config.json
+
+# Node.js / React Specific
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+build/
+dist/
+*.cache
+.eslintcache
+*.lock
+
+# IDE Specific
+.idea/
+.vscode/
+*.swp
+*.sublime-workspace
+*.sublime-project
+
+# OS Specific
+Thumbs.db
+Desktop.ini
