@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import PlayerSearch from './components/PlayerSearch';
 import PlayerStats from './components/PlayerStats';
+import PredictionForm from './components/PredictionForm';
 
 function App() {
   const [playerName, setPlayerName] = useState("");
@@ -16,6 +17,7 @@ function App() {
       </header>
 
       <PlayerSearch onSearch={handleSearch} />
+      <PredictionForm />
       <PlayerStats playerName={playerName} />
     </div>
   );

@@ -1,7 +1,10 @@
 from django.urls import path
-from .views import get_player_stats, recommend_players
+from . import views
 
 urlpatterns = [
-    path("player-stats/<str:player_name>/", get_player_stats, name="get_player-stats"),
-    path("recommend/<str:player_name>/", recommend_players, name="recommend-players"),
+    path('generate-and-train/', views.generate_and_train, name='generate_and_train'),
+    path('predict-points/<str:player_name>/<str:team_name>/<int:threshold>/', views.predict_points, name='predict_points'),
+    path('predict-rebounds/<str:player_name>/<str:team_name>/<int:threshold>/', views.predict_rebounds, name='predict_rebounds'),
+    path('predict-blocks/<str:player_name>/<str:team_name>/<int:threshold>/', views.predict_blocks, name='predict_blocks'),
+    path('predict-assists/<str:player_name>/<str:team_name>/<int:threshold>/', views.predict_assists, name='predict_assists'),
 ]

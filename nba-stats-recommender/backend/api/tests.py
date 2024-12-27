@@ -3,6 +3,7 @@ from django.urls import reverse
 from rest_framework.test import APIClient
 from rest_framework import status
 from unittest.mock import patch
+from nba_api.stats.endpoints import playergamelog
 import pandas as pd
 
 
@@ -61,41 +62,17 @@ class PlayerStatsTests(TestCase):
         self.assertEqual(response.data["stats"][0]["PTS"], 30)
 
 
-class PlayerRecommendationTests(TestCase):
-    def setUp(self):
-        self.client = APIClient()
-        self.valid_player = "LeBron James"
-        self.invalid_player = "Unknown Player"
-
+class PredictPointsTests(TestCase):
     @patch("nba_api.stats.endpoints.playergamelog.PlayerGameLog.get_data_frames")
-    def test_recommend_players_valid(self, mock_get_data_frames):
-        """
-        Test fetching recommendations for a valid player with mocked API response.
-        """
-        # Mock the target player's stats
-        mock_get_data_frames.side_effect = [
-            pd.DataFrame([{"PTS": 30, "REB": 10, "AST": 8}]),  # Target player stats
-            pd.DataFrame([{"PTS": 29, "REB": 9, "AST": 7}]),   # First similar player stats
-            pd.DataFrame([{"PTS": 28, "REB": 8, "AST": 6}]),   # Second similar player stats
+    def test_predict_points(self, mock_get_data_frames):
+        # Mock game logs
+        mock_get_data_frames.return_value = [
+            pd.DataFrame({
+                "MATCHUP": ["LAL vs GSW", "LAL vs GSW"],
+                "PTS": [35, 28]
+            })
         ]
 
-        # Debugging
-        print("Mock side effect:", mock_get_data_frames.side_effect)
-
-        response = self.client.get(reverse("recommend-players", args=[self.valid_player]))
-
-        # Debugging: Print the response data
-        print("Response data:", response.data)
-
-        # Assertions
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(response.data["player"], self.valid_player)
-        self.assertTrue(len(response.data["recommendations"]) > 0)
-        
-    def test_recommend_players_invalid(self):
-        """
-        Test fetching recommendations for an invalid player.
-        """
-        response = self.client.get(reverse("recommend-players", args=[self.invalid_player]))
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertIn("error", response.data)
+        response = self.client.get("/api/predict-points/LeBron James/Golden State Warriors/30/")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("likelihood", response.json())
