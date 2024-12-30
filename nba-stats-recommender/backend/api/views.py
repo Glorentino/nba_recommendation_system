@@ -17,15 +17,19 @@ model_paths = {
     "blocks": os.path.join(BASE_DIR, "ml_model_blocks.pkl"),
     "assists": os.path.join(BASE_DIR, "ml_model_assists.pkl"),
 }
+
 models = {}
-
-# Load models if files exist
 for stat_type, path in model_paths.items():
-    if os.path.exists(path):
-        models[stat_type] = joblib.load(path)
-    else:
+    try:
+        if os.path.exists(path):
+            models[stat_type] = joblib.load(path)
+            print(f"Loaded model for {stat_type}.")
+        else:
+            models[stat_type] = None
+            print(f"Model for {stat_type} not found. Please train the models.")
+    except Exception as e:
         models[stat_type] = None
-
+        print(f"Error loading model for {stat_type}: {e}")
 
 @api_view(["POST"])
 def generate_and_train(request):
@@ -33,14 +37,8 @@ def generate_and_train(request):
     Generate dataset and train ML models automatically.
     """
     try:
-        # Generate dataset
-        generate_dataset(output_path="player_data.csv")
-        print("Dataset generated successfully.")
-
-        # Train models
-        train_ml_model()
-        print("Model training completed.")
-
+        generate_dataset(output_file="player_data.csv")  # Generate dataset
+        train_ml_model()  # Train models
         return Response({"message": "Dataset generated and models trained successfully."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
@@ -51,19 +49,20 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
     Core function to predict a stat type using a specific model.
     """
     if model is None:
-        return Response({"error": f"The model for {stat_type} is not available. Please train the models first."},
-                        status=status.HTTP_503_SERVICE_UNAVAILABLE)
+        return {"error": f"The model for {stat_type} is not available. Please train the models first."}, status.HTTP_503_SERVICE_UNAVAILABLE
 
     player_info = players.find_players_by_full_name(player_name)
     if not player_info:
-        return Response({"error": "Player not found"}, status=status.HTTP_404_NOT_FOUND)
+        return {"error": "Player not found"}, status.HTTP_404_NOT_FOUND
 
     team_info = [
         team for team in teams.get_teams()
-        if team_name.lower() in team["full_name"].lower() or team_name.lower() in team["nickname"].lower()
-    ]
+        if team_name.lower() in team["full_name"].lower() or
+        team_name.lower() in team["nickname"].lower() or
+        team_name.lower() in team["abbreviation"].lower()
+        ]
     if not team_info:
-        return Response({"error": "Team not found"}, status=status.HTTP_404_NOT_FOUND)
+        return {"error": f"Team '{team_name}' not found."}, status.HTTP_404_NOT_FOUND
 
     try:
         current_season = get_current_season()
@@ -72,11 +71,10 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         games_against_team = gamelog[gamelog["MATCHUP"].str.contains(team_abbreviation)]
 
         if games_against_team.empty:
-            return Response({"message": f"No games found against {team_info[0]['full_name']} this season."},
-                            status=status.HTTP_404_NOT_FOUND)
+            return {"message": f"No games found against {team_info[0]['full_name']} this season."}, status.HTTP_404_NOT_FOUND
 
         # Prepare input data for prediction
-        feature_data = games_against_team[["REB", "AST", "BLK", "PTS"]]  # Include relevant features
+        feature_data = games_against_team[["PTS", "REB", "AST", "BLK" ]]
         predictions = model.predict(feature_data)
 
         total_games = len(predictions)
@@ -85,33 +83,40 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
 
         game_details = games_against_team[["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK"]].to_dict(orient="records")
 
-        return Response({
+        return {
             "player": player_name,
             "team": team_info[0]["full_name"],
             "stat_type": stat_type,
             "threshold": threshold,
             "likelihood": f"{likelihood:.2f}%",
             "games": game_details,
-        })
+        }, status.HTTP_200_OK
     except Exception as e:
-        return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+        return {"error": f"An error occurred: {e}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
-    return _predict_stat(models["points"], player_name, team_name, threshold, "points")
+    try:
+        response, status_code = _predict_stat(models["points"], player_name, team_name, threshold, "points")
+        return Response(response, status=status_code)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
 def predict_rebounds(request, player_name, team_name, threshold):
-    return _predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
+    response, status_code = _predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
+    return Response(response, status=status_code)
 
 
 @api_view(["GET"])
 def predict_blocks(request, player_name, team_name, threshold):
-    return _predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
+    response, status_code = _predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
+    return Response(response, status=status_code)
 
 
 @api_view(["GET"])
 def predict_assists(request, player_name, team_name, threshold):
-    return _predict_stat(models["assists"], player_name, team_name, threshold, "assists")
+    response, status_code = _predict_stat(models["assists"], player_name, team_name, threshold, "assists")
+    return Response(response, status=status_code)
