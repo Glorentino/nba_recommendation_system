@@ -1,5 +1,6 @@
 import os
 import joblib
+import pandas as pd
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -42,7 +43,47 @@ def generate_and_train(request):
         return Response({"message": "Dataset generated and models trained successfully."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+STAT_COLUMN_MAP = {
+    "points": "PTS",
+    "rebounds": "REB",
+    "assists": "AST",
+    "blocks": "BLK",
+}
+def calculate_dynamic_threshold(games_against_team, stat_type):
+    """
+    Calculate a dynamic threshold based on the player's historical stats against the team.
 
+    Args:
+        games_against_team (DataFrame): Filtered game log data for games against a specific team.
+        stat_type (str): Human-readable stat type (e.g., "points", "rebounds").
+
+    Returns:
+        float: Dynamic threshold value based on historical stats, or None if insufficient data.
+    """
+    # Map the stat_type to the actual column name
+    stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
+    if not stat_column:
+        print(f"Invalid stat type: {stat_type}")
+        return None
+
+    if games_against_team.empty:
+        print(f"No data available to calculate dynamic threshold for {stat_type}.")
+        return None
+
+    if stat_column not in games_against_team.columns:
+        print(f"Column '{stat_column}' not found in the dataset.")
+        return None
+
+    avg_stat = games_against_team[stat_column].mean()
+    std_dev_stat = games_against_team[stat_column].std()
+
+    if pd.isna(avg_stat) or pd.isna(std_dev_stat):
+        print(f"Insufficient data to calculate threshold for {stat_type}.")
+        return None
+
+    dynamic_threshold = avg_stat + (0.5 * std_dev_stat)
+    print(f"Dynamic threshold for {stat_type}: {dynamic_threshold:.2f}")
+    return dynamic_threshold
 
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
     """
@@ -60,7 +101,7 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         if team_name.lower() in team["full_name"].lower() or
         team_name.lower() in team["nickname"].lower() or
         team_name.lower() in team["abbreviation"].lower()
-        ]
+    ]
     if not team_info:
         return {"error": f"Team '{team_name}' not found."}, status.HTTP_404_NOT_FOUND
 
@@ -73,12 +114,32 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         if games_against_team.empty:
             return {"message": f"No games found against {team_info[0]['full_name']} this season."}, status.HTTP_404_NOT_FOUND
 
+        # # Map stat type to correct column in the dataset
+        # stat_column_map = {
+        #     "points": "PTS",
+        #     "rebounds": "REB",
+        #     "assists": "AST",
+        #     "blocks": "BLK"
+        # }
+
+        stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
+        if stat_column is None:
+            return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
+
+        # Calculate dynamic threshold if not provided
+        if threshold is None or threshold == 0:
+            dynamic_threshold = calculate_dynamic_threshold(games_against_team, stat_column)
+            if dynamic_threshold is None:
+                return {"error": f"Not enough data to calculate a dynamic threshold for {stat_type}"}, status.HTTP_400_BAD_REQUEST
+            threshold = dynamic_threshold
+
         # Prepare input data for prediction
-        feature_data = games_against_team[["PTS", "REB", "AST", "BLK" ]]
+        feature_data = games_against_team[["PTS", "REB", "AST", "BLK"]]
         predictions = model.predict(feature_data)
 
+        # Calculate likelihood dynamically
         total_games = len(predictions)
-        games_meeting_threshold = sum(pred >= threshold for pred in predictions)
+        games_meeting_threshold = sum(games_against_team[stat_column] >= threshold)
         likelihood = (games_meeting_threshold / total_games) * 100
 
         game_details = games_against_team[["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK"]].to_dict(orient="records")
@@ -93,8 +154,6 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         }, status.HTTP_200_OK
     except Exception as e:
         return {"error": f"An error occurred: {e}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
-
-
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
     try:
@@ -106,17 +165,27 @@ def predict_points(request, player_name, team_name, threshold):
 
 @api_view(["GET"])
 def predict_rebounds(request, player_name, team_name, threshold):
-    response, status_code = _predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
-    return Response(response, status=status_code)
+    try:
+        response, status_code = _predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
+        return Response(response, status=status_code)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 
 @api_view(["GET"])
 def predict_blocks(request, player_name, team_name, threshold):
-    response, status_code = _predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
-    return Response(response, status=status_code)
+    try:
+        response, status_code = _predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
+        return Response(response, status=status_code)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 @api_view(["GET"])
 def predict_assists(request, player_name, team_name, threshold):
-    response, status_code = _predict_stat(models["assists"], player_name, team_name, threshold, "assists")
-    return Response(response, status=status_code)
+    try:
+        response, status_code = _predict_stat(models["assists"], player_name, team_name, threshold, "assists")
+        return Response(response, status=status_code)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

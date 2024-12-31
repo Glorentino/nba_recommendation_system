@@ -84,7 +84,7 @@ const PredictionForm = () => {
                 <div>
                     <h2>Prediction Results</h2>
                     <p>
-                        {prediction.player} has a {prediction.likelihood}% chance of exceeding{" "}
+                        {prediction.player} has a {prediction.likelihood} chance of exceeding{" "}
                         {threshold} {statType} against {prediction.team}.
                     </p>
 
