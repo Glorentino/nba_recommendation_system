@@ -123,7 +123,6 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         return {"error": f"The model for {stat_type} is not available. Please train the models first."}, status.HTTP_503_SERVICE_UNAVAILABLE
 
     try:
-        # Try fetching player and team info from NBA API
         player_info = players.find_players_by_full_name(player_name)
         if not player_info:
             raise ValueError("Player not found")
@@ -149,18 +148,9 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         if stat_column is None:
             return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
 
-        # Calculate dynamic threshold if not provided
-        if threshold is None or threshold == 0:
-            dynamic_threshold = calculate_dynamic_threshold(games_against_team, stat_column)
-            if dynamic_threshold is None:
-                return {"error": f"Not enough data to calculate a dynamic threshold for {stat_type}"}, status.HTTP_400_BAD_REQUEST
-            threshold = dynamic_threshold
-
-        # Prepare input data for prediction
         feature_data = games_against_team[["PTS", "REB", "AST", "BLK"]]
         predictions = model.predict(feature_data)
 
-        # Calculate likelihood dynamically
         total_games = len(predictions)
         games_meeting_threshold = sum(games_against_team[stat_column] >= threshold)
         likelihood = (games_meeting_threshold / total_games) * 100
@@ -175,17 +165,25 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
             "likelihood": f"{likelihood:.2f}%",
             "games": game_details,
         }, status.HTTP_200_OK
+
     except Exception as e:
         print(f"Error with NBA API: {e}")
         # Fallback to local dataset
         if os.path.exists(FALLBACK_DATASET):
             try:
                 fallback_data = pd.read_csv(FALLBACK_DATASET)
-                filtered_data = fallback_data[(fallback_data["Player"] == player_name) & (fallback_data["Team"] == team_name)]
+                filtered_data = fallback_data[
+                    (fallback_data["PLAYER_NAME"] == player_name) &
+                    (fallback_data["MATCHUP"].str.contains(team_name, case=False))
+                ]
                 if filtered_data.empty:
                     return {"error": f"No data available for {player_name} in {team_name}."}, status.HTTP_404_NOT_FOUND
 
-                stat_value = filtered_data[stat_type.upper()].mean()
+                stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
+                if not stat_column:
+                    return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
+
+                stat_value = filtered_data[stat_column].mean()
                 return {
                     "player": player_name,
                     "team": team_name,
@@ -198,6 +196,7 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
                 return {"error": f"An error occurred: {fallback_error}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
         else:
             return {"error": "Fallback dataset not found. Please ensure 'player_data.csv' is available."}, status.HTTP_500_INTERNAL_SERVER_ERROR
+
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
     try:
