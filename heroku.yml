@@ -5,4 +5,4 @@ release:
   command:
     - python nba-stats-recommender/backend/manage.py migrate
 run:
-  web: gunicorn nba-stats-recommender.backend.wsgi:application --bind 0.0.0.0:$PORT
+  web: gunicorn nba-stats-recommender.backened.backend.wsgi:application --bind 0.0.0.0:$PORT
