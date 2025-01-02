@@ -14,6 +14,8 @@ from .train_ml_model import train_ml_model
 
 # Define paths and load ML models dynamically
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# Path to your fallback dataset
+FALLBACK_DATASET = os.path.join(BASE_DIR, "player_data.csv")
 model_paths = {
     "points": os.path.join(BASE_DIR, "ml_model_points.pkl"),
     "rebounds": os.path.join(BASE_DIR, "ml_model_rebounds.pkl"),
@@ -115,25 +117,26 @@ def fetch_gamelog_with_retries(player_id, season, max_retries=5, backoff_factor=
 
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
     """
-    Core function to predict a stat type using a specific model.
+    Core function to predict a stat type using a specific model, with a fallback mechanism.
     """
     if model is None:
         return {"error": f"The model for {stat_type} is not available. Please train the models first."}, status.HTTP_503_SERVICE_UNAVAILABLE
 
-    player_info = players.find_players_by_full_name(player_name)
-    if not player_info:
-        return {"error": "Player not found"}, status.HTTP_404_NOT_FOUND
-
-    team_info = [
-        team for team in teams.get_teams()
-        if team_name.lower() in team["full_name"].lower() or
-        team_name.lower() in team["nickname"].lower() or
-        team_name.lower() in team["abbreviation"].lower()
-    ]
-    if not team_info:
-        return {"error": f"Team '{team_name}' not found."}, status.HTTP_404_NOT_FOUND
-
     try:
+        # Try fetching player and team info from NBA API
+        player_info = players.find_players_by_full_name(player_name)
+        if not player_info:
+            raise ValueError("Player not found")
+
+        team_info = [
+            team for team in teams.get_teams()
+            if team_name.lower() in team["full_name"].lower() or
+            team_name.lower() in team["nickname"].lower() or
+            team_name.lower() in team["abbreviation"].lower()
+        ]
+        if not team_info:
+            raise ValueError(f"Team '{team_name}' not found.")
+
         current_season = get_current_season()
         gamelog = fetch_gamelog_with_retries(player_info[0]["id"], current_season)
         team_abbreviation = team_info[0]["abbreviation"]
@@ -141,14 +144,6 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
 
         if games_against_team.empty:
             return {"message": f"No games found against {team_info[0]['full_name']} this season."}, status.HTTP_404_NOT_FOUND
-
-        # # Map stat type to correct column in the dataset
-        # stat_column_map = {
-        #     "points": "PTS",
-        #     "rebounds": "REB",
-        #     "assists": "AST",
-        #     "blocks": "BLK"
-        # }
 
         stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
         if stat_column is None:
@@ -181,7 +176,28 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
             "games": game_details,
         }, status.HTTP_200_OK
     except Exception as e:
-        return {"error": f"An error occurred: {e}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
+        print(f"Error with NBA API: {e}")
+        # Fallback to local dataset
+        if os.path.exists(FALLBACK_DATASET):
+            try:
+                fallback_data = pd.read_csv(FALLBACK_DATASET)
+                filtered_data = fallback_data[(fallback_data["Player"] == player_name) & (fallback_data["Team"] == team_name)]
+                if filtered_data.empty:
+                    return {"error": f"No data available for {player_name} in {team_name}."}, status.HTTP_404_NOT_FOUND
+
+                stat_value = filtered_data[stat_type.upper()].mean()
+                return {
+                    "player": player_name,
+                    "team": team_name,
+                    "stat_type": stat_type,
+                    "fallback_value": stat_value,
+                    "message": "Prediction made using fallback dataset.",
+                }, status.HTTP_200_OK
+            except Exception as fallback_error:
+                print(f"Error with fallback mechanism: {fallback_error}")
+                return {"error": f"An error occurred: {fallback_error}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
+        else:
+            return {"error": "Fallback dataset not found. Please ensure 'player_data.csv' is available."}, status.HTTP_500_INTERNAL_SERVER_ERROR
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
     try:
