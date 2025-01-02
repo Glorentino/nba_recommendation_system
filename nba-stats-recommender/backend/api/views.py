@@ -1,6 +1,8 @@
 import os
 import joblib
 import pandas as pd
+import requests
+from time import sleep
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
@@ -85,6 +87,32 @@ def calculate_dynamic_threshold(games_against_team, stat_type):
     print(f"Dynamic threshold for {stat_type}: {dynamic_threshold:.2f}")
     return dynamic_threshold
 
+
+def fetch_gamelog_with_retries(player_id, season, max_retries=5, backoff_factor=2):
+    """
+    Fetch player game log with retries on rate-limit errors.
+
+    Args:
+        player_id (str): The player's ID.
+        season (str): The season to fetch data for.
+        max_retries (int): Maximum number of retries.
+        backoff_factor (int): Backoff multiplier for retries.
+
+    Returns:
+        DataFrame: Game log data.
+    """
+    for attempt in range(max_retries):
+        try:
+            return playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
+        except requests.exceptions.RequestException as e:
+            if "429" in str(e) or "rate limit" in str(e).lower():
+                wait_time = backoff_factor * (2 ** attempt)
+                print(f"Rate limit hit. Retrying in {wait_time} seconds...")
+                sleep(wait_time)
+            else:
+                raise e
+    raise Exception("Max retries exceeded. Could not fetch player game log.")
+
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
     """
     Core function to predict a stat type using a specific model.
@@ -107,7 +135,7 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
 
     try:
         current_season = get_current_season()
-        gamelog = playergamelog.PlayerGameLog(player_id=player_info[0]["id"], season=current_season).get_data_frames()[0]
+        gamelog = fetch_gamelog_with_retries(player_info[0]["id"], current_season)
         team_abbreviation = team_info[0]["abbreviation"]
         games_against_team = gamelog[gamelog["MATCHUP"].str.contains(team_abbreviation)]
 
