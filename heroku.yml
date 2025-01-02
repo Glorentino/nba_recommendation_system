@@ -3,4 +3,6 @@ build:
     web: nba-stats-recommender/backend/Dockerfile
 release:
   command:
-    - python manage.py migrate
+    - python nba-stats-recommender/backend/manage.py migrate
+run:
+  web: gunicorn nba-stats-recommender.backend.wsgi:application --bind 0.0.0.0:$PORT
