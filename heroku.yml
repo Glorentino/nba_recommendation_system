@@ -1,6 +1,6 @@
 build:
   docker:
-    web: backend/Dockerfile
+    web: nba-stats-recommender/backend/Dockerfile
 release:
   command:
     - python manage.py migrate
