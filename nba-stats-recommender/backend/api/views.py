@@ -105,7 +105,7 @@ def fetch_gamelog_with_retries(player_id, season, max_retries=5, backoff_factor=
     """
     for attempt in range(max_retries):
         try:
-            return playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
+            return playergamelog.PlayerGameLog(player_id=player_id, season=season, timeout=60).get_data_frames()[0]
         except requests.exceptions.RequestException as e:
             if "429" in str(e) or "rate limit" in str(e).lower():
                 wait_time = backoff_factor * (2 ** attempt)
