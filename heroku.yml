@@ -1,0 +1,6 @@
+build:
+  docker:
+    web: backend/Dockerfile
+release:
+  command:
+    - python manage.py migrate
