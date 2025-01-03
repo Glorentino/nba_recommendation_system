@@ -1,6 +1,5 @@
 import os
 import joblib
-import random
 import pandas as pd
 import requests
 from time import sleep
@@ -12,40 +11,16 @@ from nba_api.stats.static import players, teams
 from .utils.season_utils import get_current_season
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
+from selenium import webdriver
+from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.common.by import By
+
 
 # Define paths and load ML models dynamically
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Path to your fallback dataset
 FALLBACK_DATASET = os.path.join(BASE_DIR, "player_data.csv")
-
-# Define a list of proxies
-PROXY_POOL = [
-    "http://50.168.72.112:80",
-    "http://3.136.29.104:80",
-    "http://50.239.72.18:80",
-]
-
-def get_random_proxy():
-    """
-    Select a random proxy from the proxy pool.
-    """
-    return random.choice(PROXY_POOL)
-
-def validate_proxy(proxy):
-    """
-    Validate if a proxy is working.
-    """
-    try:
-        response = requests.get("https://httpbin.org/ip", proxies={"http": proxy, "https": proxy}, timeout=5)
-        return response.status_code == 200
-    except:
-        return False
-
-def filter_valid_proxies(proxy_pool):
-    """
-    Validate all proxies in the pool and return only the working ones.
-    """
-    return [proxy for proxy in proxy_pool if validate_proxy(proxy)]
 
 # Filter the proxy pool
 PROXY_POOL = filter_valid_proxies(PROXY_POOL)
@@ -126,42 +101,48 @@ def calculate_dynamic_threshold(games_against_team, stat_type):
     return dynamic_threshold
 
 
-def fetch_gamelog_with_retries(player_id, season, max_retries=5, backoff_factor=2):
+# Utility for fetching player data using Selenium
+def fetch_player_data_with_selenium(player_name, season):
     """
-    Fetch player game log with retries on rate-limit errors.
-
-    Args:
-        player_id (str): The player's ID.
-        season (str): The season to fetch data for.
-        max_retries (int): Maximum number of retries.
-        backoff_factor (int): Backoff multiplier for retries.
-
-    Returns:
-        DataFrame: Game log data.
+    Fetch player data using Selenium as a fallback for the NBA API.
     """
-    for attempt in range(max_retries):
-        proxy = get_random_proxy()  # Get a random proxy
-        proxies = {
-            "http": proxy,
-            "https": proxy,
-        }
-        try:
-            # Use proxies in the request
-            print(f"Using proxy: {proxy}")
-            response = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
-            return response
-        except requests.exceptions.RequestException as e:
-            if "429" in str(e) or "rate limit" in str(e).lower():
-                wait_time = backoff_factor * (2 ** attempt)
-                print(f"Rate limit hit. Retrying in {wait_time} seconds using a new proxy...")
-                sleep(wait_time)
-            else:
-                print(f"Error with proxy {proxy}: {e}")
-    raise Exception("Max retries exceeded. Could not fetch player game log.")
+    try:
+        chrome_options = Options()
+        chrome_options.add_argument("--headless")
+        chrome_options.add_argument("--no-sandbox")
+        chrome_options.add_argument("--disable-dev-shm-usage")
 
+        service = Service("/usr/local/bin/chromedriver")  # Path to ChromeDriver
+        driver = webdriver.Chrome(service=service, options=chrome_options)
+
+        player = players.find_players_by_full_name(player_name)
+        if not player:
+            raise ValueError("Player not found.")
+
+        player_id = player[0]["id"]
+        nba_url = f"https://www.nba.com/stats/player/{player_id}/?Season={season}"
+
+        driver.get(nba_url)
+        sleep(5)
+
+        stats_table = driver.find_element(By.CLASS_NAME, "nba-stat-table")
+        rows = stats_table.find_elements(By.TAG_NAME, "tr")
+
+        data = []
+        for row in rows[1:]:  # Skip the header row
+            columns = row.find_elements(By.TAG_NAME, "td")
+            data.append([col.text for col in columns])
+
+        driver.quit()
+        return pd.DataFrame(data)
+    except Exception as e:
+        print(f"Selenium Error: {e}")
+        return None
+
+# Prediction function with fallback mechanisms
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
     """
-    Core function to predict a stat type using a specific model, with a fallback mechanism.
+    Core function to predict a stat type using a specific model, with fallback mechanisms.
     """
     if model is None:
         return {"error": f"The model for {stat_type} is not available. Please train the models first."}, status.HTTP_503_SERVICE_UNAVAILABLE
@@ -180,66 +161,32 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         if not team_info:
             raise ValueError(f"Team '{team_name}' not found.")
 
-        current_season = get_current_season()
-        gamelog = fetch_gamelog_with_retries(player_info[0]["id"], current_season)
-        team_abbreviation = team_info[0]["abbreviation"]
-        games_against_team = gamelog[gamelog["MATCHUP"].str.contains(team_abbreviation)]
+        gamelog = playergamelog.PlayerGameLog(player_id=player_info[0]["id"], season="2023-24").get_data_frames()[0]
+        stat_column = stat_type.upper()
+        predictions = model.predict(gamelog[["PTS", "REB", "AST", "BLK"]])
 
-        if games_against_team.empty:
-            return {"message": f"No games found against {team_info[0]['full_name']} this season."}, status.HTTP_404_NOT_FOUND
-
-        stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
-        if stat_column is None:
-            return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
-
-        feature_data = games_against_team[["PTS", "REB", "AST", "BLK"]]
-        predictions = model.predict(feature_data)
-
-        total_games = len(predictions)
-        games_meeting_threshold = sum(games_against_team[stat_column] >= threshold)
-        likelihood = (games_meeting_threshold / total_games) * 100
-
-        game_details = games_against_team[["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK"]].to_dict(orient="records")
-
+        likelihood = (predictions >= threshold).mean() * 100
         return {
             "player": player_name,
             "team": team_info[0]["full_name"],
             "stat_type": stat_type,
-            "threshold": threshold,
             "likelihood": f"{likelihood:.2f}%",
-            "games": game_details,
         }, status.HTTP_200_OK
-
     except Exception as e:
-        print(f"Error with NBA API: {e}")
-        # Fallback to local dataset
-        if os.path.exists(FALLBACK_DATASET):
-            try:
-                fallback_data = pd.read_csv(FALLBACK_DATASET)
-                filtered_data = fallback_data[
-                    (fallback_data["PLAYER_NAME"] == player_name) &
-                    (fallback_data["MATCHUP"].str.contains(team_name, case=False))
-                ]
-                if filtered_data.empty:
-                    return {"error": f"No data available for {player_name} in {team_name}."}, status.HTTP_404_NOT_FOUND
-
-                stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
-                if not stat_column:
-                    return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
-
-                stat_value = filtered_data[stat_column].mean()
-                return {
-                    "player": player_name,
-                    "team": team_name,
-                    "stat_type": stat_type,
-                    "fallback_value": stat_value,
-                    "message": "Prediction made using fallback dataset.",
-                }, status.HTTP_200_OK
-            except Exception as fallback_error:
-                print(f"Error with fallback mechanism: {fallback_error}")
-                return {"error": f"An error occurred: {fallback_error}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
+        print(f"NBA API failed: {e}")
+        print("Using Selenium as a fallback...")
+        fallback_data = fetch_player_data_with_selenium(player_name, "2023-24")
+        if fallback_data is not None:
+            predictions = model.predict(fallback_data[["PTS", "REB", "AST", "BLK"]])
+            likelihood = (predictions >= threshold).mean() * 100
+            return {
+                "player": player_name,
+                "stat_type": stat_type,
+                "likelihood": f"{likelihood:.2f}%",
+                "source": "Selenium fallback",
+            }, status.HTTP_200_OK
         else:
-            return {"error": "Fallback dataset not found. Please ensure 'player_data.csv' is available."}, status.HTTP_500_INTERNAL_SERVER_ERROR
+            return {"error": "Could not fetch player data using Selenium."}, status.HTTP_500_INTERNAL_SERVER_ERROR
 
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
