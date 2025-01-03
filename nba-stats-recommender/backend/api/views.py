@@ -1,5 +1,6 @@
 import os
 import joblib
+import random
 import pandas as pd
 import requests
 from time import sleep
@@ -16,6 +17,41 @@ from .train_ml_model import train_ml_model
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Path to your fallback dataset
 FALLBACK_DATASET = os.path.join(BASE_DIR, "player_data.csv")
+
+# Define a list of proxies
+PROXY_POOL = [
+    "http://50.168.72.112:80",
+    "http://3.136.29.104:80",
+    "http://50.239.72.18:80",
+]
+
+def get_random_proxy():
+    """
+    Select a random proxy from the proxy pool.
+    """
+    return random.choice(PROXY_POOL)
+
+def validate_proxy(proxy):
+    """
+    Validate if a proxy is working.
+    """
+    try:
+        response = requests.get("https://httpbin.org/ip", proxies={"http": proxy, "https": proxy}, timeout=5)
+        return response.status_code == 200
+    except:
+        return False
+
+def filter_valid_proxies(proxy_pool):
+    """
+    Validate all proxies in the pool and return only the working ones.
+    """
+    return [proxy for proxy in proxy_pool if validate_proxy(proxy)]
+
+# Filter the proxy pool
+PROXY_POOL = filter_valid_proxies(PROXY_POOL)
+if not PROXY_POOL:
+    raise Exception("No valid proxies available. Please update the proxy list.")
+
 model_paths = {
     "points": os.path.join(BASE_DIR, "ml_model_points.pkl"),
     "rebounds": os.path.join(BASE_DIR, "ml_model_rebounds.pkl"),
@@ -104,15 +140,23 @@ def fetch_gamelog_with_retries(player_id, season, max_retries=5, backoff_factor=
         DataFrame: Game log data.
     """
     for attempt in range(max_retries):
+        proxy = get_random_proxy()  # Get a random proxy
+        proxies = {
+            "http": proxy,
+            "https": proxy,
+        }
         try:
-            return playergamelog.PlayerGameLog(player_id=player_id, season=season, timeout=60).get_data_frames()[0]
+            # Use proxies in the request
+            print(f"Using proxy: {proxy}")
+            response = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
+            return response
         except requests.exceptions.RequestException as e:
             if "429" in str(e) or "rate limit" in str(e).lower():
                 wait_time = backoff_factor * (2 ** attempt)
-                print(f"Rate limit hit. Retrying in {wait_time} seconds...")
+                print(f"Rate limit hit. Retrying in {wait_time} seconds using a new proxy...")
                 sleep(wait_time)
             else:
-                raise e
+                print(f"Error with proxy {proxy}: {e}")
     raise Exception("Max retries exceeded. Could not fetch player game log.")
 
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
