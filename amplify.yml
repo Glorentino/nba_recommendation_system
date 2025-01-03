@@ -3,8 +3,7 @@ frontend:
   phases:
     preBuild:
       commands:
-        - cd nba-stats-recommender
-        - cd frontend
+        - cd nba-stats-recommender/frontend
         - npm install
     build:
       commands:
@@ -15,4 +14,4 @@ frontend:
       - '**/*'
   cache:
     paths:
-      - nba-stats-recommender/frontend/node_modules/**/* # Caching dependencies
+      - nba-stats-recommender/frontend/node_modules/**/*
