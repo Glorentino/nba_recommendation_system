@@ -7,7 +7,7 @@ from sklearn.metrics import accuracy_score
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DATA_FILE = os.path.join(BASE_DIR, "player_data.csv")
+DATA_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
 MODEL_FILES = {
     "points": os.path.join(BASE_DIR, "ml_model_points.pkl"),
     "rebounds": os.path.join(BASE_DIR, "ml_model_rebounds.pkl"),
