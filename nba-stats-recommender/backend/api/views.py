@@ -113,41 +113,32 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
         if stats.empty:
             return {"error": f"No stats found for player {player_name}."}, status.HTTP_404_NOT_FOUND
 
-        # Ensure GAME_DATE is in datetime format
-        stats["GAME_DATE"] = pd.to_datetime(stats["GAME_DATE"], errors="coerce")
-        stats = stats.dropna(subset=["GAME_DATE"])
-
         # Sort stats by GAME_DATE and get the last 5 games
+        stats["GAME_DATE"] = pd.to_datetime(stats["GAME_DATE"])
         recent_games = stats.sort_values(by="GAME_DATE", ascending=False).head(5)
 
         # Filter games against the specified team
         games_against_team = stats[stats["MATCHUP"].str.contains(team_name, case=False, na=False)]
+
         if games_against_team.empty:
-            return {"error": f"No games found for player {player_name} against team {team_name}."}, status.HTTP_404_NOT_FOUND
+            print(f"No games found for player {player_name} against team {team_name}. Using only recent games.")
+        
+        # Combine recent games and games against the team
+        combined_games = pd.concat([games_against_team, recent_games]).drop_duplicates()
+
+        if combined_games.empty:
+            return {"error": "No data available to make a prediction."}, status.HTTP_404_NOT_FOUND
 
         stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
         if not stat_column:
             return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
 
-        # Calculate dynamic threshold if not provided
-        if threshold is None or threshold == 0:
-            dynamic_threshold = calculate_dynamic_threshold(games_against_team, stat_type)
-            if dynamic_threshold is None:
-                return {"error": f"Not enough data to calculate a dynamic threshold for {stat_type}"}, status.HTTP_400_BAD_REQUEST
-            threshold = dynamic_threshold
-
-        # Prepare input data for prediction
-        feature_data = games_against_team[["PTS", "REB", "AST", "BLK"]]
-        predictions = model.predict(feature_data)
-
-        total_games = len(games_against_team)
-        if total_games == 0:
-            return {"error": "No games available for prediction."}, status.HTTP_400_BAD_REQUEST
-
-        games_meeting_threshold = sum(games_against_team[stat_column] >= threshold)
+        # Calculate the likelihood based on the combined dataset
+        total_games = len(combined_games)
+        games_meeting_threshold = sum(combined_games[stat_column] >= threshold)
         likelihood = (games_meeting_threshold / total_games) * 100
 
-        # Include recent games in the response
+        # Prepare the response
         recent_game_details = recent_games.to_dict(orient="records")
         game_details = games_against_team.to_dict(orient="records")
 
@@ -157,12 +148,11 @@ def _predict_stat(model, player_name, team_name, threshold, stat_type):
             "stat_type": stat_type,
             "threshold": threshold,
             "likelihood": f"{likelihood:.2f}%",
-            "recent_games": recent_game_details,
-            "games": game_details,
+            "recent_games": recent_game_details,  # Include recent games
+            "games": game_details,  # Include games against the team
         }, status.HTTP_200_OK
     except Exception as e:
         return {"error": f"An error occurred: {e}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
-
 
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
