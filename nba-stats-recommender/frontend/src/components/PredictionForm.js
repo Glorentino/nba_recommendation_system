@@ -13,7 +13,7 @@ const PredictionForm = () => {
     const [loading, setLoading] = useState(false);
 
     const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-
+    
     useEffect(() => {
         // Fetch players
         const fetchPlayers = async () => {
@@ -124,7 +124,7 @@ const PredictionForm = () => {
                         {threshold} {statType} against {prediction.team}.
                     </p>
 
-                    <h3>Game Logs</h3>
+                    <h3>Game Logs (Against {teamName})</h3>
                     <table border="1" style={{ marginTop: "20px" }}>
                         <thead>
                             <tr>
@@ -138,6 +138,32 @@ const PredictionForm = () => {
                         </thead>
                         <tbody>
                             {prediction.games.map((game, index) => (
+                                <tr key={index}>
+                                    <td>{game.GAME_DATE}</td>
+                                    <td>{game.MATCHUP}</td>
+                                    <td>{game.PTS}</td>
+                                    <td>{game.REB}</td>
+                                    <td>{game.AST}</td>
+                                    <td>{game.BLK}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    <h3>Last 5 Recent Games</h3>
+                    <table border="1" style={{ marginTop: "20px" }}>
+                        <thead>
+                            <tr>
+                                <th>Game Date</th>
+                                <th>Matchup</th>
+                                <th>Points</th>
+                                <th>Rebounds</th>
+                                <th>Assists</th>
+                                <th>Blocks</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {prediction.recent_games.map((game, index) => (
                                 <tr key={index}>
                                     <td>{game.GAME_DATE}</td>
                                     <td>{game.MATCHUP}</td>
