@@ -16,7 +16,7 @@ const PredictionForm = () => {
         setLoading(true);
 
 
-        const API_BASE_URL = "http://127.0.0.1:8000/api";
+        const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
         const apiEndpointMap = {
           points: "predict-points",
           rebounds: "predict-rebounds",
