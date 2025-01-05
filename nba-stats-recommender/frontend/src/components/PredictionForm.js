@@ -13,7 +13,7 @@ const PredictionForm = () => {
     const [loading, setLoading] = useState(false);
 
     const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    
+
     useEffect(() => {
         // Fetch players
         const fetchPlayers = async () => {
@@ -65,7 +65,7 @@ const PredictionForm = () => {
             if (response.ok) {
                 setPrediction(data);
             } else {
-                setErrorMessage(data.message || "An error occurred. Please try again.");
+                setErrorMessage(data.error || "An error occurred. Please try again.");
             }
         } catch (error) {
             setErrorMessage("Failed to fetch prediction. Please check your connection.");
