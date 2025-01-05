@@ -11,6 +11,28 @@ REGION = "us-east-1"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
+def query_all_players():
+    """
+    Fetch all unique player names from DynamoDB.
+    """
+    response = table.scan(ProjectionExpression="PLAYER_NAME")
+    items = response.get("Items", [])
+    player_names = {item["PLAYER_NAME"] for item in items if "PLAYER_NAME" in item}
+    return list(player_names)
+
+def query_all_teams():
+    """
+    Fetch all unique team names from DynamoDB.
+    """
+    response = table.scan(ProjectionExpression="MATCHUP")
+    items = response.get("Items", [])
+    team_names = set()
+    for item in items:
+        if "MATCHUP" in item:
+            matchup = item["MATCHUP"]
+            teams = matchup.split(" vs. ") if " vs. " in matchup else matchup.split(" @ ")
+            team_names.update(teams)
+    return list(team_names)
 
 def convert_to_decimal(value):
     """

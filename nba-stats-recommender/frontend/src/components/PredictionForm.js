@@ -1,30 +1,62 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import Select from "react-select";
 
 const PredictionForm = () => {
     const [playerName, setPlayerName] = useState("");
     const [teamName, setTeamName] = useState("");
     const [threshold, setThreshold] = useState("");
-    const [statType, setStatType] = useState("points")
+    const [statType, setStatType] = useState("points");
+    const [players, setPlayers] = useState([]);
+    const [teams, setTeams] = useState([]);
     const [prediction, setPrediction] = useState(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [loading, setLoading] = useState(false);
 
+    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+
+    useEffect(() => {
+        // Fetch players
+        const fetchPlayers = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/player-names/`);
+                const data = await response.json();
+                const sortedPlayers = data.sort((a, b) => a.localeCompare(b));
+                setPlayers(sortedPlayers.map((player) => ({ label: player, value: player })));
+            } catch (error) {
+                console.error("Error fetching player names:", error);
+            }
+        };
+
+        // Fetch teams
+        const fetchTeams = async () => {
+            try {
+                const response = await fetch(`${API_BASE_URL}/team-names/`);
+                const data = await response.json();
+                const sortedTeams = data.sort((a, b) => a.localeCompare(b));
+                setTeams(sortedTeams.map((team) => ({ label: team, value: team })));
+            } catch (error) {
+                console.error("Error fetching team names:", error);
+            }
+        };
+
+        fetchPlayers();
+        fetchTeams();
+    }, []);
+
     const handleSubmit = async (e) => {
         e.preventDefault();
-        setErrorMessage();
+        setErrorMessage("");
         setPrediction(null);
         setLoading(true);
 
-
-        const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
         const apiEndpointMap = {
-          points: "predict-points",
-          rebounds: "predict-rebounds",
-          blocks: "predict-blocks",
-          assists: "predict-assists",
-      };
+            points: "predict-points",
+            rebounds: "predict-rebounds",
+            blocks: "predict-blocks",
+            assists: "predict-assists",
+        };
 
-       const endpoint = apiEndpointMap[statType];
+        const endpoint = apiEndpointMap[statType];
         try {
             const response = await fetch(
                 `${API_BASE_URL}/${endpoint}/${encodeURIComponent(playerName)}/${encodeURIComponent(teamName)}/${threshold}/`
@@ -44,28 +76,32 @@ const PredictionForm = () => {
 
     return (
         <div>
-                        <h2>Player Performance Prediction</h2>
+            <h2>Player Performance Prediction</h2>
             <form onSubmit={handleSubmit}>
-                <input
-                    type="text"
-                    placeholder="Player Name (e.g., LeBron James)"
-                    value={playerName}
-                    onChange={(e) => setPlayerName(e.target.value)}
+                {/* Player Dropdown with Search */}
+                <Select
+                    options={players}
+                    onChange={(selectedOption) => setPlayerName(selectedOption.value)}
+                    placeholder="Select Player"
+                    isSearchable
                     required
                 />
-                <input
-                    type="text"
-                    placeholder="Team Name (e.g., Golden State Warriors)"
-                    value={teamName}
-                    onChange={(e) => setTeamName(e.target.value)}
+
+                {/* Team Dropdown with Search */}
+                <Select
+                    options={teams}
+                    onChange={(selectedOption) => setTeamName(selectedOption.value)}
+                    placeholder="Select Team"
+                    isSearchable
                     required
                 />
+
                 <input
                     type="number"
                     placeholder="Threshold (e.g., 30)"
                     value={threshold}
                     onChange={(e) => setThreshold(e.target.value)}
-                    min="1" // Validation to ensure positive numbers
+                    min="1"
                     required
                 />
                 <select value={statType} onChange={(e) => setStatType(e.target.value)}>
@@ -74,7 +110,7 @@ const PredictionForm = () => {
                     <option value="blocks">Blocks</option>
                     <option value="assists">Assists</option>
                 </select>
-                <button type="submit" disabled={loading}> {/* Disable button while loading */}
+                <button type="submit" disabled={loading}>
                     {loading ? "Predicting..." : "Predict"}
                 </button>
             </form>
@@ -124,6 +160,7 @@ const PredictionForm = () => {
                 </div>
             )}
         </div>
-      );
-}
+    );
+};
+
 export default PredictionForm;

@@ -4,7 +4,7 @@ import pandas as pd
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .utils.dynamodb_helper import query_player_stats
+from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
 
@@ -51,6 +51,35 @@ def generate_and_train(request):
         return Response({"message": "Dataset generated and models trained successfully."}, status=status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["GET"])
+def get_player_names(request):
+    """
+    Fetch all unique player names from DynamoDB.
+    """
+    try:
+        player_names = query_all_players()  # Fetch player names from DynamoDB
+        if not player_names:
+            return Response({"message": "No player names found."}, status=status.HTTP_404_NOT_FOUND)
+        player_names_sorted = sorted(player_names)  # Sort player names alphabetically
+        return Response(player_names_sorted, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["GET"])
+def get_team_names(request):
+    """
+    Fetch all unique team names from DynamoDB.
+    """
+    try:
+        team_names = query_all_teams()  # Fetch team names from DynamoDB
+        if not team_names:
+            return Response({"message": "No team names found."}, status=status.HTTP_404_NOT_FOUND)
+        team_names_sorted = sorted(team_names)  # Sort team names alphabetically
+        return Response(team_names_sorted, status=status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 def calculate_dynamic_threshold(games_against_team, stat_type):
     stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
