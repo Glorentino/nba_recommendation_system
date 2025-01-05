@@ -1,10 +1,16 @@
 import os
 import pandas as pd
 import joblib
+import logging
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import accuracy_score
 
+logging.basicConfig(
+    level=logging.INFO,  # Change to DEBUG for more verbose output
+    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+)
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
@@ -26,7 +32,7 @@ def validate_columns(data, required_columns):
     """
     missing_columns = [col for col in required_columns if col not in data.columns]
     if missing_columns:
-        print(f"Error: Missing columns in dataset: {', '.join(missing_columns)}")
+        logger.error("Missing columns in dataset: %s", ', '.join(missing_columns))
         return False
     return True
 
@@ -34,11 +40,12 @@ def train_ml_model():
     # Load dataset
     try:
         data = pd.read_csv(DATA_FILE)
+        logger.info("Loaded data file: %s", DATA_FILE)
     except FileNotFoundError:
-        print(f"Error: Data file {DATA_FILE} not found.")
+        logger.error("Data file %s not found.", DATA_FILE)
         return
     except Exception as e:
-        print(f"Error loading data file: {e}")
+        logger.error("Error loading data file: %s", e)
         return
 
     # Validate required columns
@@ -60,22 +67,25 @@ def train_ml_model():
 
             # Split data
             X_train, X_test, y_train, y_test = train_test_split(features, labels, test_size=0.2, random_state=42)
-            print("Training data size:", len(X_train))
-            print("Test data size:", len(X_test))
+            logger.info(
+                "Training %s model. Training data size: %d, Test data size: %d", 
+                stat, len(X_train), len(X_test)
+            )
+            
             # Train model
-            print(f"Training model for {stat}...")
             model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
             model.fit(X_train, y_train)
+            logger.info("Training completed for %s model.", stat)
 
             # Save model
             joblib.dump(model, model_file)
-            print(f"Model for {stat} saved to {model_file}.")
+            logger.info("Model for %s saved to %s.", stat, model_file)
 
             # Evaluate model
             accuracy = accuracy_score(y_test, model.predict(X_test))
-            print(f"Accuracy for {stat} model: {accuracy * 100:.2f}%")
+            logger.info("Accuracy for %s model: %.2f%%", stat, accuracy * 100)
         except Exception as e:
-            print(f"Error training model for {stat}: {e}")
+            logger.error("Error training model for %s: %s", stat, e)
 
 if __name__ == "__main__":
     train_ml_model()

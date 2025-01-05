@@ -17,6 +17,7 @@ logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(message)s"
 )
+logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
@@ -46,10 +47,15 @@ def get_current_season():
         return f"{current_year - 1}-{str(current_year)[2:]}"
 
 def get_all_active_players():
-    active_players = players.get_active_players()
-    if not active_players:
-        logging.warning("No active players found. Check the NBA API.")
-    return active_players
+    try:
+        active_players = players.get_active_players()
+        if not active_players:
+            logger.warning("No active players found. Check the NBA API.")
+        return active_players
+    except Exception as e:
+        logger.error(f"Error fetching active players: {e}")
+        return []
+
 
 def get_player_gamelog(player_name, player_id, season, retries=3, delay=5):
     for attempt in range(retries):
@@ -57,17 +63,15 @@ def get_player_gamelog(player_name, player_id, season, retries=3, delay=5):
             gamelog = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
             return gamelog
         except Exception as e:
-            print(f"Attempt {attempt + 1} failed for player ID {player_id} - {player_name}: {e}")
-            logging.error(f"Attempt {attempt + 1} failed for player ID {player_id}: {e}")
+            logging.error(f"Attempt {attempt + 1} failed for player ID {player_id} ({player_name}): {e}")
             time.sleep(delay)
             
-    print(f"Failed to fetch game log for player ID {player_id} and {player_name} after {retries} attempts.")
-    logging.error(f"Failed to fetch game log for player ID {player_id} after {retries} attempts.")
+
+    logging.error(f"Failed to fetch game log for player ID {player_id} ({player_name}) after {retries} attempts.")
     return None
 
 def process_player_data(player, season):
     player_name = player["full_name"]
-    print(f"Processing data for {player_name}...")
     logging.info(f"Processing player: {player_name} (ID: {player['id']})")
     try:
         gamelog = get_player_gamelog(player_name, player["id"], season)
@@ -85,7 +89,7 @@ def process_player_data(player, season):
 
             # Save intermediate player data
             #player_file = os.path.join(PLAYER_DIR, f"{player_name.replace(' ', '_')}.csv")
-            gamelog.to_csv(player_file, index=False)
+            # gamelog.to_csv(player_file, index=False)
 
             return gamelog
         else:
