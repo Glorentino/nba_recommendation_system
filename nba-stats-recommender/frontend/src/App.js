@@ -15,10 +15,7 @@ function App() {
       <header className="App-header">
         <h1>NBA Stats Recommendation System</h1>
       </header>
-
-      <PlayerSearch onSearch={handleSearch} />
       <PredictionForm />
-      <PlayerStats playerName={playerName} />
     </div>
   );
 }
