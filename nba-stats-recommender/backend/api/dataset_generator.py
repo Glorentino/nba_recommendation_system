@@ -63,6 +63,7 @@ def get_player_gamelog(player_name, player_id, season, retries=3, delay=5):
             gamelog = playergamelog.PlayerGameLog(player_id=player_id, season=season).get_data_frames()[0]
             return gamelog
         except Exception as e:
+            print(f"Attempt {attempt + 1} failed for player ID {player_id} ({player_name}): {e}")
             logging.error(f"Attempt {attempt + 1} failed for player ID {player_id} ({player_name}): {e}")
             time.sleep(delay)
             
@@ -73,6 +74,7 @@ def get_player_gamelog(player_name, player_id, season, retries=3, delay=5):
 def process_player_data(player, season):
     player_name = player["full_name"]
     logging.info(f"Processing player: {player_name} (ID: {player['id']})")
+    print(f"Processing player: {player_name} (ID: {player['id']})")
     try:
         gamelog = get_player_gamelog(player_name, player["id"], season)
         if gamelog is not None:

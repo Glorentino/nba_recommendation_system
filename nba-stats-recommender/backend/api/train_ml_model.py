@@ -3,8 +3,8 @@ import pandas as pd
 import joblib
 import logging
 from sklearn.model_selection import train_test_split
-from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
 logging.basicConfig(
     level=logging.INFO,  # Change to DEBUG for more verbose output
@@ -73,7 +73,7 @@ def train_ml_model():
             )
             
             # Train model
-            model = RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
+            model = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42)
             model.fit(X_train, y_train)
             logger.info("Training completed for %s model.", stat)
 
@@ -82,8 +82,15 @@ def train_ml_model():
             logger.info("Model for %s saved to %s.", stat, model_file)
 
             # Evaluate model
-            accuracy = accuracy_score(y_test, model.predict(X_test))
-            logger.info("Accuracy for %s model: %.2f%%", stat, accuracy * 100)
+            predictions = model.predict(X_test)
+            mae = mean_absolute_error(y_test, predictions)
+            mse = mean_squared_error(y_test, predictions)
+            r2 = r2_score(y_test, predictions)
+
+            logger.info(
+                "Metrics for %s model: MAE=%.2f, MSE=%.2f, R²=%.2f",
+                stat, mae, mse, r2
+            )
         except Exception as e:
             logger.error("Error training model for %s: %s", stat, e)
 
