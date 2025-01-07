@@ -6,7 +6,8 @@ function App() {
   return (
     <div className="App">
       <header className="App-header">
-        <h1>NBA Stats Recommendation System</h1>
+        <h1><img  src={"/logo.png"} alt="Logo"  style={{ width: "50px", height: "50px" }}/>
+        NBA Player Performance Predictor</h1>
       </header>
       <PredictionForm />
     </div>

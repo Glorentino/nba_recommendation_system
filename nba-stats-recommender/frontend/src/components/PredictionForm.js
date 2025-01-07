@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
 
+
 const PredictionForm = () => {
     const [playerName, setPlayerName] = useState("");
     const [teamName, setTeamName] = useState("");
@@ -13,6 +14,7 @@ const PredictionForm = () => {
     const [loading, setLoading] = useState(false);
 
     const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    // const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -79,6 +81,7 @@ const PredictionForm = () => {
             <h2>Player Performance Prediction</h2>
             <form onSubmit={handleSubmit}>
                 {/* Player Dropdown with Search */}
+                <p>Select A Player:</p>
                 <Select
                     options={players}
                     onChange={(selectedOption) => setPlayerName(selectedOption.value)}
@@ -88,6 +91,7 @@ const PredictionForm = () => {
                 />
 
                 {/* Team Dropdown with Search */}
+                <p>Against Which Team:</p>
                 <Select
                     options={teams}
                     onChange={(selectedOption) => setTeamName(selectedOption.value)}
@@ -95,7 +99,7 @@ const PredictionForm = () => {
                     isSearchable
                     required
                 />
-
+                <p>Select The Stat:</p>
                 <input
                     type="number"
                     placeholder="Threshold (e.g., 30)"

@@ -106,7 +106,11 @@ def player_trends(request, player_name):
         if stats.empty:
             logger.warning("No stats found for player %s.", player_name)
             return Response({"error": f"No stats found for player {player_name}."}, status=status.HTTP_404_NOT_FOUND)
-    
+
+        if "GAME_DATE" not in stats.columns or "PTS" not in stats.columns:
+            logger.warning("Required columns are missing for player %s.", player_name)
+            return Response({"error": "Required columns are missing in the data."}, status=status.HTTP_404_NOT_FOUND)
+        
         # Sort by GAME_DATE for chronological trends
         stats["GAME_DATE"] = pd.to_datetime(stats["GAME_DATE"])
         stats = stats.sort_values("GAME_DATE")
@@ -127,8 +131,11 @@ def team_comparisons(request):
     try:
         # fetch all teams data (I should aggregate this in my database some how for efficiency)
         team_names = query_all_teams()
-        team_stats = []
+        if not team_names:
+            logger.warning("No team names available.")
+            return Response({"error": "No team names available."}, status=status.HTTP_404_NOT_FOUND)
         
+        team_stats = []
         for team in team_names:
             # Fetch stats for each team (or aggregate in DynamoDB query for optimization)
             stats = query_team_stats(team)
@@ -156,12 +163,18 @@ def player_averages_vs_opponents(request, player_name):
         # Fetch player stats
         stats = query_player_stats(player_name)
         if stats.empty:
+            logger.warning("No stats found for player %s.", player_name)
             return Response({"error": f"No stats found for player {player_name}."}, status=status.HTTP_404_NOT_FOUND)
+        
+        if "MATCHUP" not in stats.columns or "PTS" not in stats.columns:
+            logger.warning("Required columns are missing for player %s.", player_name)
+            return Response({"error": "Required columns are missing in the data."}, status=status.HTTP_400_BAD_REQUEST)
+        
         # group by opponent (team) and calculate averages
         stats["Opponent"] = stats["MATCHUP"].str.extract(r'vs\. (\w+)|@ (\w+)', expand=True).bfill(axis=1)[0]
         averages = stats.groupby("Opponent")[["PTS", "REB", "AST", "BLK"]].mean().reset_index()
-        
         averages_dict = averages.to_dict(orient="records")
+        
         logger.info("Calculated averages against opponents for player %s.", player_name)
         return Response({"player": player_name, "averages_vs_opponents": averages_dict}, status=status.HTTP_200_OK)
     except Exception as e:
