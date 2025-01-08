@@ -48,7 +48,8 @@ def get_current_season():
 
 def get_all_active_players():
     try:
-        active_players = players.get_active_players()
+        all_players = players.get_players()
+        active_players = [player for player in all_players if player.get("is_active")]
         if not active_players:
             logger.warning("No active players found. Check the NBA API.")
         return active_players
@@ -83,11 +84,16 @@ def process_player_data(player, season):
 
             # Add thresholds
             for col, (stat, threshold) in THRESHOLD_COLUMNS.items():
-                gamelog[col] = (gamelog[stat] >= threshold).astype(int)
-
+                if stat in gamelog.columns:
+                    gamelog[col] = (gamelog[stat] >= threshold).astype(int)
+                else:
+                    logging.warning(f"Missing column {stat} for player {player_name}. Threshold not applied.")
             # Add rolling averages
             for col, (stat, window) in DYNAMIC_THRESHOLDS.items():
-                gamelog[col] = gamelog[stat].rolling(window=window).mean().fillna(0)
+                if stat in gamelog.columns:
+                    gamelog[col] = gamelog[stat].rolling(window=window).mean().fillna(0)
+                else:
+                    logging.warning(f"Missing column {stat} for player {player_name}. Rolling average not calculated.")
 
             # Save intermediate player data
             #player_file = os.path.join(PLAYER_DIR, f"{player_name.replace(' ', '_')}.csv")
