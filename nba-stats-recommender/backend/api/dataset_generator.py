@@ -48,8 +48,7 @@ def get_current_season():
 
 def get_all_active_players():
     try:
-        all_players = players.get_players()
-        active_players = [player for player in all_players if player.get("is_active")]
+        active_players = players.get_active_players()
         if not active_players:
             logger.warning("No active players found. Check the NBA API.")
         return active_players

@@ -10,6 +10,17 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+def safe_convert_to_decimal(value):
+    """
+    Safely convert values to Decimal for DynamoDB compatibility.
+    """
+    try:
+        if pd.notnull(value) and value != "":
+            return Decimal(str(value))
+    except Exception as e:
+        logger.error(f"Error converting value {value}: {e}")
+    return None
+
 # Load the dataset
 dataset_path = "player_data.csv"  # Update this path if necessary
 try:
@@ -22,47 +33,51 @@ except Exception as e:
     logger.error(f"Error loading dataset: {e}. Exiting script.")
     exit(1)
 
-# Step 1: Verify data types and float presence
-logger.info("Verifying data types and float presence...")
+# Step 1: Validate required columns
+required_columns = ["PLAYER_NAME", "HOME_AWAY"]
+missing_columns = [col for col in required_columns if col not in data.columns]
+if missing_columns:
+    logger.error(f"Missing required columns: {missing_columns}. Exiting script.")
+    exit(1)
 
-# Check for remaining float columns
-remaining_float_columns = data.select_dtypes(include=["float"]).columns
-if len(remaining_float_columns) > 0:
-    logger.warning(f"Remaining float columns: {remaining_float_columns}")
+if data["PLAYER_NAME"].isnull().any():
+    missing_count = data["PLAYER_NAME"].isnull().sum()
+    logger.error(f"'PLAYER_NAME' column contains {missing_count} null values. Removing invalid rows.")
+    data = data.dropna(subset=["PLAYER_NAME"])
+
+# Step 2: Replace NaN values in critical fields with defaults
+data.fillna(value={
+    "WL": "Unknown",
+    "VIDEO_AVAILABLE": 0,  # Replace with a default value if necessary
+}, inplace=True)
+
+# Step 3: Convert numeric columns to Decimal
+logger.info("Converting numeric columns to Decimal...")
+numeric_columns = [
+    "MIN", "FGM", "FGA", "FG_PCT", "FG3M", "FG3A", "FG3_PCT", "FTM", "FTA", "FT_PCT",
+    "OREB", "DREB", "REB", "AST", "STL", "BLK", "TOV", "PF", "PTS", "PLUS_MINUS",
+    "POINTS_THRESHOLD", "REBOUNDS_THRESHOLD", "BLOCKS_THRESHOLD", "ASSISTS_THRESHOLD",
+    "ROLLING_PTS_AVG", "ROLLING_REB_AVG", "ROLLING_AST_AVG"
+]
+
+for column in numeric_columns:
+    if column in data.columns:
+        try:
+            data[column] = data[column].apply(safe_convert_to_decimal)
+            logger.info(f"Converted column '{column}' to Decimal.")
+        except Exception as e:
+            logger.error(f"Error converting column '{column}': {e}")
+
+# Step 4: Log rows containing float values
+logger.info("Checking for remaining float values...")
+float_rows = data.applymap(lambda x: isinstance(x, float)).any(axis=1)
+if float_rows.any():
+    problematic_rows = data[float_rows]
+    logger.error(f"Rows containing float values:\n{problematic_rows}")
 else:
-    logger.info("No float columns remain.")
+    logger.info("All numeric columns successfully converted to Decimal.")
 
-# Check for any float values row-wise
-def check_for_floats(row):
-    return any(isinstance(val, float) for val in row.values)
-
-float_rows = data.apply(check_for_floats, axis=1).sum()
-if float_rows > 0:
-    logger.warning(f"Number of rows with float values: {float_rows}")
-else:
-    logger.info("No rows contain float values.")
-
-# Step 2: Reconvert all float columns to Decimal
-logger.info("Converting float columns to Decimal...")
-for column in data.columns:
-    try:
-        if data[column].dtype == "float64" or data[column].dtype == "object":
-            try:
-                data[column] = data[column].apply(lambda x: Decimal(str(x)) if pd.notnull(x) else None)
-                logger.info(f"Converted column '{column}' to Decimal.")
-            except Exception as e:
-                print(f"Error converting column '{column}': {e}")
-    except Exception as e:
-        logger.error(f"Error converting column '{column}': {e}")
-
-# Final check for remaining float values
-remaining_float_columns_after = data.select_dtypes(include=["float"]).columns
-if len(remaining_float_columns_after) > 0:
-    logger.warning(f"After conversion, float columns still exist: {remaining_float_columns_after}")
-else:
-    logger.info("All float columns successfully converted to Decimal.")
-
-# Step 3: Upload sanitized data to DynamoDB
+# Step 5: Upload sanitized data to DynamoDB
 if __name__ == "__main__":
     logger.info("Starting upload to DynamoDB...")
     try:

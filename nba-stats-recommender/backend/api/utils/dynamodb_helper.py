@@ -18,18 +18,28 @@ REGION = "us-east-1"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
+response = table.scan()
+print("Items in DynamoDB:")
+for item in response.get('Items', []):
+    print(item)
+
 def query_all_players():
     """
     Fetch all unique player names from DynamoDB.
     """
     try:
+        player_names = set()
         response = table.scan(ProjectionExpression="PLAYER_NAME")
-        items = response.get("Items", [])
-        player_names = {item["PLAYER_NAME"] for item in items if "PLAYER_NAME" in item}
+        while True:
+            items = response.get("Items", [])
+            player_names.update(item["PLAYER_NAME"] for item in items if "PLAYER_NAME" in item)
+            if 'LastEvaluatedKey' not in response:
+                break
+            response = table.scan(ProjectionExpression="PLAYER_NAME", ExclusiveStartKey=response['LastEvaluatedKey'])
         logging.info("Fetched %d unique player names.", len(player_names))
         return list(player_names)
-    except ClientError as e:
-        logger.error("Error fetching player: %s", e)
+    except Exception as e:
+        logger.error("Error fetching players: %s", e)
         return []
 
 def query_all_teams():
