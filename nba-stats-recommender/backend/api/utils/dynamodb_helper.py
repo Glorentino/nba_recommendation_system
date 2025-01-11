@@ -168,3 +168,17 @@ def query_team_stats(team_name):
     except ClientError as e:
         logger.error("Error querying stats for team %s: %s", team_name, e)
         return pd.DataFrame()
+    
+def get_players_from_team(team_name, exclude_player=None):
+    try:
+        response = table.scan(
+            FilterExpression=Attr("TEAM_NAME").eq(team_name),
+            ProjectionExpression="PLAYER_NAME, PTS, REB, AST, BLK"
+        )
+        items = response.get("Items", [])
+        if exclude_player:
+            items = [item for item in items if item["PLAYER_NAME"] != exclude_player]
+        return items
+    except Exception as e:
+        logger.error(f"Error fetching players from teams {team_name}: {e}")
+        return []
