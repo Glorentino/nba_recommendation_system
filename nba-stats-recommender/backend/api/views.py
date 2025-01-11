@@ -96,6 +96,20 @@ def get_team_names(request):
         return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 @api_view(["GET"])
+def get_player_team(request, player_name):
+    """
+    Fetches a players own team from DDB
+    """
+    try:
+        stats = query_player_stats(player_name)
+        if stats.empty:
+            return Response({"error": "Player not found"}, status=status.HTTP_404_NOT_FOUND)
+        player_team = stats["MATCHUP"].iloc[0].split(" ")[0]
+        return Response({"team": player_team}, status.HTTP_200_OK)
+    except Exception as e:
+        return Response({"error": f"An error occured: {e}"}, status=status.HTTP_500_INTERNAL_ERROR)
+
+@api_view(["GET"])
 def player_trends(request, player_name):
     """
     Returns a player's performance trends over time

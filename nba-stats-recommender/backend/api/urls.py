@@ -12,4 +12,5 @@ urlpatterns = [
     path("player-trends/<str:player_name>/", views.player_trends, name="player_trends"),
     path("team-comparison/", views.team_comparisons, name="team_comparisons"),
     path("player-averages-vs-opponents/<str:player_name>/", views.player_averages_vs_opponents, name="player_averages_vs_opponents"),
+    path("player-team/<str:player_name>/", views.get_player_team, name="player_team"),
 ]

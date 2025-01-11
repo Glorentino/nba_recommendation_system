@@ -18,10 +18,6 @@ REGION = "us-east-1"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
-response = table.scan()
-print("Items in DynamoDB:")
-for item in response.get('Items', []):
-    print(item)
 
 def query_all_players():
     """

@@ -9,12 +9,13 @@ const PredictionForm = () => {
     const [statType, setStatType] = useState("points");
     const [players, setPlayers] = useState([]);
     const [teams, setTeams] = useState([]);
+    const [playerTeam, setPlayerTeam] = useState("");
     const [prediction, setPrediction] = useState(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    //const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -44,6 +45,21 @@ const PredictionForm = () => {
         fetchPlayers();
         fetchTeams();
     }, []);
+
+    const handlePlayerChange = async (selectedOption) => {
+        setPlayerName(selectedOption.value);
+        setPlayerTeam("");
+        setTeamName("");
+        try{
+            const response = await fetch(`${API_BASE_URL}/player-team/${encodeURIComponent(selectedOption.value)}/`);
+            const data = await response.json();
+            setPlayerTeam(data.team);
+        } catch (error) {
+            console.error("Error fetching player's team", error);
+        }
+    };
+
+    const filteredTeams = teams.filter((team) => team.value !== playerTeam);
 
     const handleSubmit = async (e) => {
         e.preventDefault();
@@ -79,25 +95,48 @@ const PredictionForm = () => {
     return (
         <div>
             <h2>Player Performance Prediction</h2>
-            <form onSubmit={handleSubmit}>
+            <form onSubmit={handleSubmit} >
                 {/* Player Dropdown with Search */}
                 <p>Select A Player:</p>
                 <Select
                     options={players}
-                    onChange={(selectedOption) => setPlayerName(selectedOption.value)}
+                    onChange={handlePlayerChange}
                     placeholder="Select Player"
                     isSearchable
                     required
+                    styles={{
+                        control: (base) => ({
+                            ...base,
+                            maxWidth: "300px", 
+                            minWidth: "150px",
+                        }),
+                        menu: (base) => ({
+                            ...base,
+                            maxWidth: "300px", 
+                        }),
+                    }}
                 />
 
                 {/* Team Dropdown with Search */}
                 <p>Against Which Team:</p>
                 <Select
-                    options={teams}
+                    options={filteredTeams}
                     onChange={(selectedOption) => setTeamName(selectedOption.value)}
                     placeholder="Select Team"
                     isSearchable
                     required
+                    isDisabled={!playerTeam}
+                                        styles={{
+                        control: (base) => ({
+                            ...base,
+                            maxWidth: "300px", 
+                            minWidth: "150px",
+                        }),
+                        menu: (base) => ({
+                            ...base,
+                            maxWidth: "300px", 
+                        }),
+                    }}
                 />
                 <p>Select The Stat:</p>
                 <input
