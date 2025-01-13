@@ -24,19 +24,22 @@ DATASET_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
 #PLAYER_DIR = os.path.join(BASE_DIR, "player_data")  # Directory for intermediate player-level files
 #os.makedirs(PLAYER_DIR, exist_ok=True)
 
-FEATURES = ["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK", "PLAYER_NAME", "HOME_AWAY"]
+FEATURES = ["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK","STL", "PLAYER_NAME", "HOME_AWAY"]
 THRESHOLD_COLUMNS = {
     "POINTS_THRESHOLD": ("PTS", 10),
     "REBOUNDS_THRESHOLD": ("REB", 5),
     "BLOCKS_THRESHOLD": ("BLK", 1),
     "ASSISTS_THRESHOLD": ("AST", 3),
+    "STEALS_THRESHOLD": ("STL", 1),
 }
 
 # Dynamic thresholds
 DYNAMIC_THRESHOLDS = {
     "ROLLING_PTS_AVG": ("PTS", 5),
     "ROLLING_REB_AVG": ("REB", 5),
+    "ROLLING_BLK_AVG": ("BLK", 5),
     "ROLLING_AST_AVG": ("AST", 5),
+    "ROLLING_STL_AVG": ("STL", 5),
 }
 
 def get_current_season():
@@ -81,6 +84,8 @@ def process_player_data(player, season):
             gamelog["PLAYER_NAME"] = player_name
             gamelog["HOME_AWAY"] = gamelog["MATCHUP"].apply(lambda x: "Home" if "vs." in x else "Away")
 
+            gamelog["TEAM_NAME"] = gamelog["MATCHUP"].apply(lambda x: x.split(" ")[0])
+            
             # Add thresholds
             for col, (stat, threshold) in THRESHOLD_COLUMNS.items():
                 if stat in gamelog.columns:

@@ -14,8 +14,8 @@ const PredictionForm = () => {
     const [errorMessage, setErrorMessage] = useState("");
     const [loading, setLoading] = useState(false);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    //const API_BASE_URL = "http://127.0.0.1:8000/api";
+    //const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -72,6 +72,7 @@ const PredictionForm = () => {
             rebounds: "predict-rebounds",
             blocks: "predict-blocks",
             assists: "predict-assists",
+            steals: "predict-steals",
         };
 
         const endpoint = apiEndpointMap[statType];
@@ -152,6 +153,7 @@ const PredictionForm = () => {
                     <option value="rebounds">Rebounds</option>
                     <option value="blocks">Blocks</option>
                     <option value="assists">Assists</option>
+                    <option value="steals">Steals</option>
                 </select>
                 <button type="submit" disabled={loading}>
                     {loading ? "Predicting..." : "Predict"}
@@ -177,6 +179,7 @@ const PredictionForm = () => {
                                 <th>Rebounds</th>
                                 <th>Assists</th>
                                 <th>Blocks</th>
+                                <th>Steals</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -188,6 +191,7 @@ const PredictionForm = () => {
                                     <td>{game.REB}</td>
                                     <td>{game.AST}</td>
                                     <td>{game.BLK}</td>
+                                    <td>{game.STL}</td>
                                 </tr>
                             ))}
                         </tbody>
@@ -203,6 +207,7 @@ const PredictionForm = () => {
                                 <th>Rebounds</th>
                                 <th>Assists</th>
                                 <th>Blocks</th>
+                                <th>Steals</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -214,6 +219,7 @@ const PredictionForm = () => {
                                     <td>{game.REB}</td>
                                     <td>{game.AST}</td>
                                     <td>{game.BLK}</td>
+                                    <td>{game.STL}</td>
                                 </tr>
                             ))}
                         </tbody>

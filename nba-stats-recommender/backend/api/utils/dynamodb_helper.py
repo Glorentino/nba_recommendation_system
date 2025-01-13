@@ -3,6 +3,7 @@ import pandas as pd
 from botocore.exceptions import ClientError
 from decimal import Decimal
 import logging 
+from boto3.dynamodb.conditions import Attr
 
 logging.basicConfig(
     level=logging.INFO,
@@ -79,14 +80,18 @@ def upload_to_dynamodb(dataframe):
             "MATCHUP": row["MATCHUP"],
             "WL": row["WL"],
             "PLAYER_NAME": row["PLAYER_NAME"],
+            "TEAM_NAME": row["TEAM_NAME"],
             "HOME_AWAY": row["HOME_AWAY"],
             "POINTS_THRESHOLD": int(row["POINTS_THRESHOLD"]),
             "REBOUNDS_THRESHOLD": int(row["REBOUNDS_THRESHOLD"]),
             "BLOCKS_THRESHOLD": int(row["BLOCKS_THRESHOLD"]),
             "ASSISTS_THRESHOLD": int(row["ASSISTS_THRESHOLD"]),
+            "STEALS_THRESHOLD": int(row["STEALS_THRESHOLD"]),
             "ROLLING_PTS_AVG": convert_to_decimal(row["ROLLING_PTS_AVG"]),
             "ROLLING_REB_AVG": convert_to_decimal(row["ROLLING_REB_AVG"]),
+            "ROLLING_BLK_AVG": convert_to_decimal(row["ROLLING_BLK_AVG"]),
             "ROLLING_AST_AVG": convert_to_decimal(row["ROLLING_AST_AVG"]),
+            "ROLLING_STL_AVG": convert_to_decimal(row["ROLLING_STL_AVG"]),
         }
 
         # Include non-null values for additional fields
@@ -156,7 +161,7 @@ def query_team_stats(team_name):
         
         # Ensure numerical columns are appropriately typed
         numeric_columns = [
-            "PTS", "REB", "AST", "BLK", "MIN", "FGM", "FGA", "FG_PCT", "FG3M",
+            "PTS", "REB", "AST", "BLK", "STL", "MIN", "FGM", "FGA", "FG_PCT", "FG3M",
             "FG3A", "FG3_PCT", "FTM", "FTA", "FT_PCT", "OREB", "DREB", "TOV", "PF", "PLUS_MINUS"
         ]
         for col in numeric_columns:
@@ -169,16 +174,35 @@ def query_team_stats(team_name):
         logger.error("Error querying stats for team %s: %s", team_name, e)
         return pd.DataFrame()
     
-def get_players_from_team(team_name, exclude_player=None):
+def query_all_player_stats():
+    """
+    Fetch all player stats from DynamoDB.
+    """
     try:
-        response = table.scan(
-            FilterExpression=Attr("TEAM_NAME").eq(team_name),
-            ProjectionExpression="PLAYER_NAME, PTS, REB, AST, BLK"
-        )
-        items = response.get("Items", [])
-        if exclude_player:
-            items = [item for item in items if item["PLAYER_NAME"] != exclude_player]
-        return items
+        all_player_stats = []
+        response = table.scan()
+        while True:
+            items = response.get("Items", [])
+            all_player_stats.extend(items)
+            if 'LastEvaluatedKey' not in response:
+                break
+            response = table.scan(ExclusiveStartKey=response['LastEvaluatedKey'])
+        
+        # Convert results to a dictionary with player names as keys
+        player_stats_dict = {}
+        for item in all_player_stats:
+            player_name = item.get("PLAYER_NAME")
+            if player_name not in player_stats_dict:
+                player_stats_dict[player_name] = []
+            player_stats_dict[player_name].append(item)
+        
+        # Convert stats for each player into DataFrames
+        for player_name, stats in player_stats_dict.items():
+            player_stats_dict[player_name] = pd.DataFrame(stats)
+        
+        logger.info("Fetched stats for %d players.", len(player_stats_dict))
+        return player_stats_dict
+
     except Exception as e:
-        logger.error(f"Error fetching players from teams {team_name}: {e}")
-        return []
+        logger.error("Error fetching all player stats: %s", e)
+        return {}

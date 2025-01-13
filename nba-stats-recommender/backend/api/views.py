@@ -5,7 +5,7 @@ import logging
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats
+from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats, query_all_player_stats
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
 
@@ -24,6 +24,7 @@ model_paths = {
     "rebounds": os.path.join(BASE_DIR, "ml_model_rebounds.pkl"),
     "blocks": os.path.join(BASE_DIR, "ml_model_blocks.pkl"),
     "assists": os.path.join(BASE_DIR, "ml_model_assists.pkl"),
+    "steals": os.path.join(BASE_DIR, "ml_model_steals.pkl"),
 }
 
 models = {}
@@ -45,6 +46,7 @@ STAT_COLUMN_MAP = {
     "rebounds": "REB",
     "assists": "AST",
     "blocks": "BLK",
+    "steals": "STL"
 }
 
 @api_view(["POST"])
@@ -130,7 +132,7 @@ def player_trends(request, player_name):
         stats = stats.sort_values("GAME_DATE")
         
         # Select columns for trends
-        trends = stats[["GAME_DATE", "PTS", "REB", "AST", "BLK"]].to_dict(orient="records")
+        trends = stats[["GAME_DATE", "PTS", "REB", "AST", "BLK", "STL"]].to_dict(orient="records")
         logger.info("Fetched trends for player %s.", player_name)
         return Response({"player": player_name, "trends":trends}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -160,6 +162,7 @@ def team_comparisons(request):
                     "average_rebounds":stats["REB"].mean(), 
                     "average_assists": stats["AST"].mean(),
                     "average_blocks":stats["BLK"].mean(), 
+                    "average_steals":stats["STL"].mean(),
                 }
                 team_stats.append(avg_stats)
         logger.info("Team comparisons calculated for %d teams.", len(team_stats))
@@ -186,7 +189,7 @@ def player_averages_vs_opponents(request, player_name):
         
         # group by opponent (team) and calculate averages
         stats["Opponent"] = stats["MATCHUP"].str.extract(r'vs\. (\w+)|@ (\w+)', expand=True).bfill(axis=1)[0]
-        averages = stats.groupby("Opponent")[["PTS", "REB", "AST", "BLK"]].mean().reset_index()
+        averages = stats.groupby("Opponent")[["PTS", "REB", "AST", "BLK", "STL"]].mean().reset_index()
         averages_dict = averages.to_dict(orient="records")
         
         logger.info("Calculated averages against opponents for player %s.", player_name)
@@ -194,7 +197,7 @@ def player_averages_vs_opponents(request, player_name):
     except Exception as e:
         logger.error("Error fetching averages for player %s: %s", player_name, e)
         return Response({"error":f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
-
+    
 def calculate_dynamic_threshold(games_against_team, stat_type):
     stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
     if not stat_column:
@@ -215,6 +218,7 @@ def calculate_dynamic_threshold(games_against_team, stat_type):
     dynamic_threshold = avg_stat + (0.5 * std_dev_stat)
     print(f"Dynamic threshold for {stat_type}: {dynamic_threshold:.2f}")
     return dynamic_threshold
+
 
 
 def _predict_stat(model, player_name, team_name, threshold, stat_type):
@@ -326,4 +330,14 @@ def predict_assists(request, player_name, team_name, threshold):
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_assists: %s", e)
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
+@api_view(["GET"])
+def predict_steals(request, player_name, team_name, threshold):
+    try:
+        logger.info("Predicting steals for player %s against team %s with threshold %s.", player_name, team_name, threshold)
+        response, status_code = _predict_stat(models["steals"], player_name, team_name, threshold, "steals")
+        return Response(response, status=status_code)
+    except Exception as e:
+        logger.error("Error in predict_steals: %s", e)
         return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
