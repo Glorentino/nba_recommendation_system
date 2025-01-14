@@ -13,9 +13,11 @@ const PredictionForm = () => {
     const [prediction, setPrediction] = useState(null);
     const [errorMessage, setErrorMessage] = useState("");
     const [loading, setLoading] = useState(false);
+    const [fetchRecommendations, setFetchRecommendations] = useState(false);
+    const [recommendations, setRecommendations] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    //const API_BASE_URL = "http://127.0.0.1:8000/api";
+    //const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -83,6 +85,17 @@ const PredictionForm = () => {
             const data = await response.json();
             if (response.ok) {
                 setPrediction(data);
+
+                if (fetchRecommendations) {
+                    const recResponse = await fetch(
+                        `${API_BASE_URL}/recommend-players/${encodeURIComponent(playerName)}/${encodeURIComponent(teamName)}/${statType}/${threshold}/`
+                    );
+                    const recData = await recResponse.json();
+                    if (recResponse.ok) {
+                        setRecommendations(recData.recommendations || []);
+                    }
+                }
+                
             } else {
                 setErrorMessage(data.error || "An error occurred. Please try again.");
             }
@@ -155,6 +168,16 @@ const PredictionForm = () => {
                     <option value="assists">Assists</option>
                     <option value="steals">Steals</option>
                 </select>
+                <div>
+                    <label>
+                        <input
+                            type="checkbox"
+                            checked={fetchRecommendations}
+                            onChange={(e) => setFetchRecommendations(e.target.checked)}
+                        />
+                        Show Top 5 Recommendations
+                    </label>
+                </div>
                 <button type="submit" disabled={loading}>
                     {loading ? "Predicting..." : "Predict"}
                 </button>
@@ -226,7 +249,18 @@ const PredictionForm = () => {
                     </table>
                 </div>
             )}
-
+            {recommendations.length > 0 && (
+                <div>
+                    <h3>Top 5 Similar Players</h3>
+                    <ul>
+                        {recommendations.map((rec, index) => (
+                            <li key={index}>
+                                {rec.player_name}: {rec.likelihood.toFixed(2)}%
+                            </li>
+                        ))}
+                    </ul>
+                </div>
+            )}
             {/* Display Error Message */}
             {errorMessage && (
                 <div style={{ color: "red", marginTop: "20px" }}>

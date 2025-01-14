@@ -14,4 +14,5 @@ urlpatterns = [
     path("team-comparison/", views.team_comparisons, name="team_comparisons"),
     path("player-averages-vs-opponents/<str:player_name>/", views.player_averages_vs_opponents, name="player_averages_vs_opponents"),
     path("player-team/<str:player_name>/", views.get_player_team, name="player_team"),
+    path('recommend-players/<str:player_name>/<str:opponent_team>/<str:stat_type>/<int:threshold>/', views.recommend_similar_players, name='recommend_similar_players'),
 ]

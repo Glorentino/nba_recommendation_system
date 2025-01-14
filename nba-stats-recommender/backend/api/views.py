@@ -5,7 +5,7 @@ import logging
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats, query_all_player_stats
+from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats, query_all_player_stats, query_players_from_same_team
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
 
@@ -219,6 +219,52 @@ def calculate_dynamic_threshold(games_against_team, stat_type):
     print(f"Dynamic threshold for {stat_type}: {dynamic_threshold:.2f}")
     return dynamic_threshold
 
+@api_view(["GET"])
+def recommend_similar_players(request, player_name, opponent_team, stat_type, threshold):
+    try:
+        logger.info(f"Fetching recommendations for player: {player_name} against {opponent_team}.")
+
+        # Fetch the player's team
+        player_stats = query_player_stats(player_name)
+        if player_stats.empty or "TEAM_NAME" not in player_stats.columns:
+            return Response({"error": f"No stats or TEAM_NAME for player '{player_name}'."}, status=status.HTTP_404_NOT_FOUND)
+        
+        player_team = player_stats["TEAM_NAME"].iloc[0]
+
+        # Get all players from the same team excluding the selected player
+        team_players = query_players_from_same_team(player_team)
+        team_players = [p for p in team_players if p != player_name]
+
+        if not team_players:
+            logger.warning(f"No other players found on team '{player_team}'.")
+            return Response({"message": f"No other players found on team '{player_team}'."}, status=status.HTTP_200_OK)
+
+        # Initialize recommendations
+        recommendations = []
+
+        # Predict likelihood for each player in the team
+        for teammate in team_players:
+            likelihood_response, status_code = _predict_stat(
+                models.get(stat_type), 
+                teammate, 
+                opponent_team, 
+                threshold, 
+                stat_type
+            )
+            if status_code == status.HTTP_200_OK:
+                likelihood = likelihood_response.get("likelihood", "0%").strip('%')
+                recommendations.append({
+                    "player_name": teammate,
+                    "likelihood": float(likelihood)
+                })
+
+        # Sort recommendations by likelihood and return the top 5
+        recommendations = sorted(recommendations, key=lambda x: x["likelihood"], reverse=True)[:5]
+        return Response({"recommendations": recommendations}, status=status.HTTP_200_OK)
+
+    except Exception as e:
+        logger.error(f"Error in recommend_similar_players: {e}")
+        return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
 def _predict_stat(model, player_name, team_name, threshold, stat_type):

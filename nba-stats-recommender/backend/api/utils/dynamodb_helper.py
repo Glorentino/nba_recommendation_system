@@ -3,7 +3,7 @@ import pandas as pd
 from botocore.exceptions import ClientError
 from decimal import Decimal
 import logging 
-from boto3.dynamodb.conditions import Attr
+from boto3.dynamodb.conditions import Attr, Key
 
 logging.basicConfig(
     level=logging.INFO,
@@ -206,3 +206,48 @@ def query_all_player_stats():
     except Exception as e:
         logger.error("Error fetching all player stats: %s", e)
         return {}
+
+def query_players_from_same_team(team_name):
+    try:
+        logger.info(f"Querying players from team: {team_name}")
+        
+        # Initialize variables for pagination
+        items = []
+        last_evaluated_key = None
+        
+        while True:
+            # Perform the scan operation
+            if last_evaluated_key:
+                response = table.scan(
+                    FilterExpression=Attr("TEAM_NAME").eq(team_name),
+                    ExclusiveStartKey=last_evaluated_key
+                )
+            else:
+                response = table.scan(
+                    FilterExpression=Attr("TEAM_NAME").eq(team_name)
+                )
+            
+            items.extend(response.get("Items", []))
+            last_evaluated_key = response.get("LastEvaluatedKey", None)
+            
+            if not last_evaluated_key:
+                break
+            
+        if not items:
+            logger.warning(f"No players found for team: {team_name}")
+            return []
+
+        df = pd.DataFrame(items)
+        if not df.empty:
+            unique_players = df["PLAYER_NAME"].drop_duplicates().tolist()
+        else:
+            unique_players = []
+        
+        logger.info(f"Fetched {len(unique_players)} unique players from team {team_name}.")
+        print(unique_players)
+        return unique_players
+
+    except Exception as e:
+        logger.error(f"Error querying players from team {team_name}: {e}")
+        return []
+    
