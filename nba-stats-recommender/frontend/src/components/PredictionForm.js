@@ -175,7 +175,7 @@ const PredictionForm = () => {
                             checked={fetchRecommendations}
                             onChange={(e) => setFetchRecommendations(e.target.checked)}
                         />
-                        Show Top 5 Recommendations
+                        Show Top 5 Similar Players
                     </label>
                 </div>
                 <button type="submit" disabled={loading}>
