@@ -21,8 +21,7 @@ logger = logging.getLogger(__name__)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
-#PLAYER_DIR = os.path.join(BASE_DIR, "player_data")  # Directory for intermediate player-level files
-#os.makedirs(PLAYER_DIR, exist_ok=True)
+
 
 FEATURES = ["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK","STL", "PLAYER_NAME", "HOME_AWAY"]
 THRESHOLD_COLUMNS = {
@@ -98,10 +97,6 @@ def process_player_data(player, season):
                     gamelog[col] = gamelog[stat].rolling(window=window).mean().fillna(0)
                 else:
                     logging.warning(f"Missing column {stat} for player {player_name}. Rolling average not calculated.")
-
-            # Save intermediate player data
-            #player_file = os.path.join(PLAYER_DIR, f"{player_name.replace(' ', '_')}.csv")
-            # gamelog.to_csv(player_file, index=False)
 
             return gamelog
         else:

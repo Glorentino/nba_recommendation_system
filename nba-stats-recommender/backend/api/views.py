@@ -6,6 +6,7 @@ from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
 from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats, query_all_player_stats, query_players_from_same_team
+from .utils.prediction_helper import stat_column_map, _predict_stat
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
 
@@ -17,7 +18,6 @@ logger = logging.getLogger(__name__)
 
 # Define paths and load ML models dynamically
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-PLAYER_DATA_PATH = os.path.join(BASE_DIR, "utils/player_data.csv")
 
 model_paths = {
     "points": os.path.join(BASE_DIR, "ml_model_points.pkl"),
@@ -40,15 +40,6 @@ for stat_type, path in model_paths.items():
         models[stat_type] = None
         logger.error("Error loading model for %s: %s", stat_type, e)
 
-
-STAT_COLUMN_MAP = {
-    "points": "PTS",
-    "rebounds": "REB",
-    "assists": "AST",
-    "blocks": "BLK",
-    "steals": "STL"
-}
-
 @api_view(["POST"])
 def generate_and_train(request):
     """
@@ -62,6 +53,7 @@ def generate_and_train(request):
     except Exception as e:
         logger.error("Error during dataset generation and model training: %s", e)
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["GET"])
 def get_player_names(request):
@@ -80,6 +72,7 @@ def get_player_names(request):
         logger.error("Error fetching player names: %s", e)
         return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 @api_view(["GET"])
 def get_team_names(request):
     """
@@ -97,6 +90,7 @@ def get_team_names(request):
         logger.error("Error fetching team names: %s", e)
         return Response({"error": f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
+
 @api_view(["GET"])
 def get_player_team(request, player_name):
     """
@@ -110,6 +104,7 @@ def get_player_team(request, player_name):
         return Response({"team": player_team}, status.HTTP_200_OK)
     except Exception as e:
         return Response({"error": f"An error occured: {e}"}, status=status.HTTP_500_INTERNAL_ERROR)
+
 
 @api_view(["GET"])
 def player_trends(request, player_name):
@@ -138,6 +133,7 @@ def player_trends(request, player_name):
     except Exception as e:
         logger.error("Error fetching trends for player %s: %s", player_name, e)
         return Response({"error":f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["GET"])
 def team_comparisons(request):
@@ -171,6 +167,7 @@ def team_comparisons(request):
         logger.error("Error in team comparisons: %s", e)
         return Response({"error":f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)        
 
+
 @api_view(["GET"])
 def player_averages_vs_opponents(request, player_name):
     """
@@ -198,26 +195,6 @@ def player_averages_vs_opponents(request, player_name):
         logger.error("Error fetching averages for player %s: %s", player_name, e)
         return Response({"error":f"An error occurred: {e}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)  
     
-def calculate_dynamic_threshold(games_against_team, stat_type):
-    stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
-    if not stat_column:
-        print(f"Invalid stat type: {stat_type}")
-        return None
-
-    if games_against_team.empty:
-        print(f"No data available to calculate dynamic threshold for {stat_type}.")
-        return None
-
-    avg_stat = games_against_team[stat_column].mean()
-    std_dev_stat = games_against_team[stat_column].std()
-
-    if pd.isna(avg_stat) or pd.isna(std_dev_stat):
-        print(f"Insufficient data to calculate threshold for {stat_type}.")
-        return None
-
-    dynamic_threshold = avg_stat + (0.5 * std_dev_stat)
-    print(f"Dynamic threshold for {stat_type}: {dynamic_threshold:.2f}")
-    return dynamic_threshold
 
 @api_view(["GET"])
 def recommend_similar_players(request, player_name, opponent_team, stat_type, threshold):
@@ -267,75 +244,6 @@ def recommend_similar_players(request, player_name, opponent_team, stat_type, th
         return Response({"error": str(e)}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
 
-def _predict_stat(model, player_name, team_name, threshold, stat_type):
-    if model is None:
-        logger.warning("Model for %s is not available. Returning error.", stat_type)
-        return {"error": f"The model for {stat_type} is not available. Please train the models first."}, status.HTTP_503_SERVICE_UNAVAILABLE
-
-    try:
-        # Fetch data directly from DynamoDB
-        stats = query_player_stats(player_name)
-        if stats.empty:
-            logger.warning("No stats found for player %s.", player_name)
-            return {"error": f"No stats found for player {player_name}."}, status.HTTP_404_NOT_FOUND
-
-        # Sort stats by GAME_DATE and get the last 5 games
-        stats["GAME_DATE"] = pd.to_datetime(stats["GAME_DATE"])
-        recent_games = stats.sort_values(by="GAME_DATE", ascending=False).head(5)
-        logger.info("Fetched last 5 recent games for player %s.", player_name)
-        
-        # Filter games against the specified team
-        games_against_team = stats[stats["MATCHUP"].str.contains(team_name, case=False, na=False)]
-
-        if games_against_team.empty:
-            logger.info(
-                "No games found for player %s against team %s. Using only recent games.", 
-                player_name, 
-                team_name
-            )
-        
-        # Combine recent games and games against the team
-        combined_games = pd.concat([games_against_team, recent_games]).drop_duplicates()
-
-        if combined_games.empty:
-            logger.warning(
-                "No data available to make a prediction for player %s against team %s.", 
-                player_name, 
-                team_name
-            )
-            return {"error": "No data available to make a prediction."}, status.HTTP_404_NOT_FOUND
-
-        stat_column = STAT_COLUMN_MAP.get(stat_type.lower())
-        if not stat_column:
-            logger.error("Invalid stat type: %s", stat_type)
-            return {"error": f"Invalid stat type: {stat_type}"}, status.HTTP_400_BAD_REQUEST
-
-        # Calculate the likelihood based on the combined dataset
-        total_games = len(combined_games)
-        games_meeting_threshold = sum(combined_games[stat_column] >= threshold)
-        likelihood = (games_meeting_threshold / total_games) * 100
-        logger.info(
-            "Prediction for %s (%s): Total games: %d, Meeting threshold: %d, Likelihood: %.2f%%.",
-            player_name, stat_type, total_games, games_meeting_threshold, likelihood
-        )
-        
-        # Prepare the response
-        recent_game_details = recent_games.to_dict(orient="records")
-        game_details = games_against_team.to_dict(orient="records")
-
-        return {
-            "player": player_name,
-            "team": team_name,
-            "stat_type": stat_type,
-            "threshold": threshold,
-            "likelihood": f"{likelihood:.2f}%",
-            "recent_games": recent_game_details,  # Include recent games
-            "games": game_details,  # Include games against the team
-        }, status.HTTP_200_OK
-    except Exception as e:
-        logger.error("Error predicting stats for player %s: %s", player_name, e)
-        return {"error": f"An error occurred: {e}"}, status.HTTP_500_INTERNAL_SERVER_ERROR
-
 @api_view(["GET"])
 def predict_points(request, player_name, team_name, threshold):
     try:
@@ -345,6 +253,7 @@ def predict_points(request, player_name, team_name, threshold):
     except Exception as e:
         logger.error("Error in predict_points: %s", e)
         return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["GET"])
 def predict_rebounds(request, player_name, team_name, threshold):
@@ -377,6 +286,7 @@ def predict_assists(request, player_name, team_name, threshold):
     except Exception as e:
         logger.error("Error in predict_assists: %s", e)
         return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+
 
 @api_view(["GET"])
 def predict_steals(request, player_name, team_name, threshold):
