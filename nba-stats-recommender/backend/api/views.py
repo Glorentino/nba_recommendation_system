@@ -5,8 +5,8 @@ import logging
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
 from rest_framework import status
-from .utils.dynamodb_helper import query_player_stats, query_all_players, query_all_teams, query_team_stats, query_all_player_stats, query_players_from_same_team
-from .utils.prediction_helper import stat_column_map, _predict_stat
+from .utils.dynamodb_helper import DDBQuery
+from .utils.prediction_helper import PredictionHelper
 from .dataset_generator import generate_dataset
 from .train_ml_model import train_ml_model
 
@@ -61,7 +61,7 @@ def get_player_names(request):
     Fetch all unique player names from DynamoDB.
     """
     try:
-        player_names = query_all_players()  # Fetch player names from DynamoDB
+        player_names = DDBQuery.query_all_players()  # Fetch player names from DynamoDB
         if not player_names:
             logger.warning("No player names found.")
             return Response({"message": "No player names found."}, status=status.HTTP_404_NOT_FOUND)
@@ -79,7 +79,7 @@ def get_team_names(request):
     Fetch all unique team names from DynamoDB.
     """
     try:
-        team_names = query_all_teams()  # Fetch team names from DynamoDB
+        team_names = DDBQuery.query_all_teams()  # Fetch team names from DynamoDB
         if not team_names:
             logger.warning("No team names found.")
             return Response({"message": "No team names found."}, status=status.HTTP_404_NOT_FOUND)
@@ -97,7 +97,7 @@ def get_player_team(request, player_name):
     Fetches a players own team from DDB
     """
     try:
-        stats = query_player_stats(player_name)
+        stats = DDBQuery.query_player_stats(player_name)
         if stats.empty:
             return Response({"error": "Player not found"}, status=status.HTTP_404_NOT_FOUND)
         player_team = stats["MATCHUP"].iloc[0].split(" ")[0]
@@ -113,7 +113,7 @@ def player_trends(request, player_name):
     """
     try:
         #Fetch a player stats from DynamoDB
-        stats = query_player_stats(player_name)
+        stats = DDBQuery.query_player_stats(player_name)
         if stats.empty:
             logger.warning("No stats found for player %s.", player_name)
             return Response({"error": f"No stats found for player {player_name}."}, status=status.HTTP_404_NOT_FOUND)
@@ -142,7 +142,7 @@ def team_comparisons(request):
     """
     try:
         # fetch all teams data (I should aggregate this in my database some how for efficiency)
-        team_names = query_all_teams()
+        team_names = DDBQuery.query_all_teams()
         if not team_names:
             logger.warning("No team names available.")
             return Response({"error": "No team names available."}, status=status.HTTP_404_NOT_FOUND)
@@ -150,7 +150,7 @@ def team_comparisons(request):
         team_stats = []
         for team in team_names:
             # Fetch stats for each team (or aggregate in DynamoDB query for optimization)
-            stats = query_team_stats(team)
+            stats = DDBQuery.query_team_stats(team)
             if not stats.empty:
                 avg_stats = {
                     "team": team,
@@ -175,7 +175,7 @@ def player_averages_vs_opponents(request, player_name):
     """
     try:
         # Fetch player stats
-        stats = query_player_stats(player_name)
+        stats = DDBQuery.query_player_stats(player_name)
         if stats.empty:
             logger.warning("No stats found for player %s.", player_name)
             return Response({"error": f"No stats found for player {player_name}."}, status=status.HTTP_404_NOT_FOUND)
@@ -202,14 +202,14 @@ def recommend_similar_players(request, player_name, opponent_team, stat_type, th
         logger.info(f"Fetching recommendations for player: {player_name} against {opponent_team}.")
 
         # Fetch the player's team
-        player_stats = query_player_stats(player_name)
+        player_stats = DDBQuery.query_player_stats(player_name)
         if player_stats.empty or "TEAM_NAME" not in player_stats.columns:
             return Response({"error": f"No stats or TEAM_NAME for player '{player_name}'."}, status=status.HTTP_404_NOT_FOUND)
         
         player_team = player_stats["TEAM_NAME"].iloc[0]
 
         # Get all players from the same team excluding the selected player
-        team_players = query_players_from_same_team(player_team)
+        team_players = DDBQuery.query_players_from_same_team(player_team)
         team_players = [p for p in team_players if p != player_name]
 
         if not team_players:
@@ -221,7 +221,7 @@ def recommend_similar_players(request, player_name, opponent_team, stat_type, th
 
         # Predict likelihood for each player in the team
         for teammate in team_players:
-            likelihood_response, status_code = _predict_stat(
+            likelihood_response, status_code = PredictionHelper._predict_stat(
                 models.get(stat_type), 
                 teammate, 
                 opponent_team, 
@@ -248,7 +248,7 @@ def recommend_similar_players(request, player_name, opponent_team, stat_type, th
 def predict_points(request, player_name, team_name, threshold):
     try:
         logger.info("Predicting points for player %s against team %s with threshold %s.", player_name, team_name, threshold)
-        response, status_code = _predict_stat(models["points"], player_name, team_name, threshold, "points")
+        response, status_code = PredictionHelper._predict_stat(models["points"], player_name, team_name, threshold, "points")
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_points: %s", e)
@@ -259,7 +259,7 @@ def predict_points(request, player_name, team_name, threshold):
 def predict_rebounds(request, player_name, team_name, threshold):
     try:
         logger.info("Predicting rebounds for player %s against team %s with threshold %s.", player_name, team_name, threshold)
-        response, status_code = _predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
+        response, status_code = PredictionHelper._predict_stat(models["rebounds"], player_name, team_name, threshold, "rebounds")
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_rebounds: %s", e)
@@ -270,7 +270,7 @@ def predict_rebounds(request, player_name, team_name, threshold):
 def predict_blocks(request, player_name, team_name, threshold):
     try:
         logger.info("Predicting blocks for player %s against team %s with threshold %s.", player_name, team_name, threshold)
-        response, status_code = _predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
+        response, status_code = PredictionHelper._predict_stat(models["blocks"], player_name, team_name, threshold, "blocks")
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_blocks: %s", e)
@@ -281,7 +281,7 @@ def predict_blocks(request, player_name, team_name, threshold):
 def predict_assists(request, player_name, team_name, threshold):
     try:
         logger.info("Predicting assists for player %s against team %s with threshold %s.", player_name, team_name, threshold)
-        response, status_code = _predict_stat(models["assists"], player_name, team_name, threshold, "assists")
+        response, status_code = PredictionHelper._predict_stat(models["assists"], player_name, team_name, threshold, "assists")
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_assists: %s", e)
@@ -292,7 +292,7 @@ def predict_assists(request, player_name, team_name, threshold):
 def predict_steals(request, player_name, team_name, threshold):
     try:
         logger.info("Predicting steals for player %s against team %s with threshold %s.", player_name, team_name, threshold)
-        response, status_code = _predict_stat(models["steals"], player_name, team_name, threshold, "steals")
+        response, status_code = PredictionHelper._predict_stat(models["steals"], player_name, team_name, threshold, "steals")
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_steals: %s", e)
