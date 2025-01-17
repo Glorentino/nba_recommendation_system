@@ -1,7 +1,7 @@
 import pandas as pd
 import logging
 from decimal import Decimal
-from dynamodb_helper import upload_to_dynamodb
+from dynamodb_helper import DDBQuery
 
 # Set up logging
 logging.basicConfig(
@@ -106,7 +106,7 @@ logger.info(f"Sample sanitized data:\n{data.head()}")
 if __name__ == "__main__":
     logger.info("Starting upload to DynamoDB...")
     try:
-        upload_to_dynamodb(data)
+        DDBQuery.upload_to_dynamodb(data)
         logger.info("Data upload to DynamoDB completed successfully.")
     except Exception as e:
         logger.error(f"Error uploading data to DynamoDB: {e}")

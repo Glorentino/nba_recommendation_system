@@ -1,6 +1,15 @@
 import React, { useState, useEffect } from "react";
 import Select from "react-select";
-
+import {
+    ScatterChart,
+    Scatter,
+    XAxis,
+    YAxis,
+    CartesianGrid,
+    Tooltip,
+    Legend,
+} from "recharts";
+import "./PredictionForm.css";
 
 const PredictionForm = () => {
     const [playerName, setPlayerName] = useState("");
@@ -15,9 +24,11 @@ const PredictionForm = () => {
     const [loading, setLoading] = useState(false);
     const [fetchRecommendations, setFetchRecommendations] = useState(false);
     const [recommendations, setRecommendations] = useState([]);
+    const [showCharts, setShowCharts] = useState(false);
+    const [playerTrends, setPlayerTrends] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    // const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -67,6 +78,7 @@ const PredictionForm = () => {
         e.preventDefault();
         setErrorMessage("");
         setPrediction(null);
+        setPlayerTrends([]);
         setLoading(true);
 
         const apiEndpointMap = {
@@ -85,7 +97,7 @@ const PredictionForm = () => {
             const data = await response.json();
             if (response.ok) {
                 setPrediction(data);
-
+                setShowCharts(true);
                 if (fetchRecommendations) {
                     const recResponse = await fetch(
                         `${API_BASE_URL}/recommend-players/${encodeURIComponent(playerName)}/${encodeURIComponent(teamName)}/${statType}/${threshold}/`
@@ -95,7 +107,12 @@ const PredictionForm = () => {
                         setRecommendations(recData.recommendations || []);
                     }
                 }
-                
+                const trendsResponse = await fetch(`${API_BASE_URL}/player-trends/${encodeURIComponent(playerName)}/`);
+                const trendsData = await trendsResponse.json();
+
+                if (trendsResponse.ok) {
+                    setPlayerTrends(trendsData.trends);
+                }
             } else {
                 setErrorMessage(data.error || "An error occurred. Please try again.");
             }
@@ -105,10 +122,29 @@ const PredictionForm = () => {
             setLoading(false);
         }
     };
+    const formatChartData = (data) =>
+        data.map((item, index) => ({
+            ...item,
+            GAME_DATE: new Date(item.GAME_DATE).toLocaleDateString(),
+            index, // Unique key for each item
+        }));
+
+    const formattedPredictionGames = prediction?.games ? formatChartData(prediction.games) : [];
+    const formattedPlayerTrends = playerTrends ? formatChartData(playerTrends) : [];
+
+    const statTypeMapping = {
+        points: "PTS",
+        rebounds: "REB",
+        assists: "AST",
+        blocks: "BLK",
+        steals: "STL",
+    };
 
     return (
         <div>
-            <h2>Player Performance Prediction</h2>
+            <div>
+                <h2 >Player Performance Prediction</h2>
+            </div>
             <form onSubmit={handleSubmit} >
                 {/* Player Dropdown with Search */}
                 <p>Select A Player:</p>
@@ -259,6 +295,34 @@ const PredictionForm = () => {
                             </li>
                         ))}
                     </ul>
+                </div>
+            )}
+
+            {/* Scatter Chart for Trends */}
+            {showCharts && prediction?.games?.length > 0 && (
+                <div>
+                    <h3>{prediction.player} Performance Against {prediction.team}</h3>
+                    <ScatterChart width={800} height={400}>
+                        <CartesianGrid />
+                        <XAxis dataKey="GAME_DATE" />
+                        <YAxis dataKey={statTypeMapping[statType]}  />
+                        <Tooltip />
+                        <Legend />
+                        <Scatter name={statType.toUpperCase()} data={formattedPredictionGames} fill="#8884d8" />
+                    </ScatterChart>
+                </div>
+            )}
+                {playerTrends.length > 0 && (
+                <div>
+                    <h3>{prediction.player}'s Overall Player Trend</h3>
+                    <ScatterChart width={800} height={400}>
+                        <CartesianGrid />
+                        <XAxis dataKey="GAME_DATE" />
+                        <YAxis dataKey={statTypeMapping[statType]} />
+                        <Tooltip />
+                        <Legend />
+                        <Scatter name={statType.toUpperCase()} data={formattedPlayerTrends} fill="#82ca9d" />
+                    </ScatterChart>
                 </div>
             )}
             {/* Display Error Message */}

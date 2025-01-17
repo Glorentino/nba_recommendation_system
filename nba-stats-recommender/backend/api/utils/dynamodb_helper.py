@@ -19,6 +19,16 @@ REGION = "us-east-1"
 dynamodb = boto3.resource("dynamodb", region_name=REGION)
 table = dynamodb.Table(DYNAMODB_TABLE)
 
+
+def convert_to_decimal(value):
+    """
+    Convert numeric values to Decimal for DynamoDB compatibility.
+    """
+    if isinstance(value, (int, float)):
+        return Decimal(str(value))
+    return value
+
+    
 class DDBQuery:
     def query_all_players():
         """
@@ -57,15 +67,6 @@ class DDBQuery:
         except ClientError as e:
             logger.error("Error fetching team names: %s", e)
             return []
-
-    def convert_to_decimal(value):
-        """
-        Convert numeric values to Decimal for DynamoDB compatibility.
-        """
-        if isinstance(value, (int, float)):
-            return Decimal(str(value))
-        return value
-
 
     def upload_to_dynamodb(dataframe):
         """
