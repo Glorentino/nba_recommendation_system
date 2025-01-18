@@ -1,0 +1,17 @@
+header {
+    background-color:rgb(97, 126, 179) ;
+    padding: 1px;
+    box-sizing: border-box;
+}
+body {
+    background-color: rgb(255, 255, 255);
+    min-height: 98vh;
+    display: flex;
+    flex-direction: column;
+}
+footer {
+    background-color:rgb(97, 126, 179) ;
+    margin-top: auto;
+    padding: 1px;
+    box-sizing: border-box;
+}

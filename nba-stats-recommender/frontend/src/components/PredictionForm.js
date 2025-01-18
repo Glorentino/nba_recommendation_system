@@ -143,11 +143,13 @@ const PredictionForm = () => {
     return (
         <div>
             <div>
-                <h2 >Player Performance Prediction</h2>
+                <h2>Player Performance Prediction</h2>
             </div>
+            
             <form onSubmit={handleSubmit} >
                 {/* Player Dropdown with Search */}
                 <p>Select A Player:</p>
+                
                 <Select
                     options={players}
                     onChange={handlePlayerChange}
@@ -188,6 +190,7 @@ const PredictionForm = () => {
                         }),
                     }}
                 />
+
                 <p>Select The Stat:</p>
                 <input
                     type="number"
@@ -308,7 +311,7 @@ const PredictionForm = () => {
                         <YAxis dataKey={statTypeMapping[statType]}  />
                         <Tooltip />
                         <Legend />
-                        <Scatter name={statType.toUpperCase()} data={formattedPredictionGames} fill="#8884d8" />
+                        <Scatter name={statType.toUpperCase()} data={formattedPredictionGames} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
                 </div>
             )}
@@ -321,7 +324,7 @@ const PredictionForm = () => {
                         <YAxis dataKey={statTypeMapping[statType]} />
                         <Tooltip />
                         <Legend />
-                        <Scatter name={statType.toUpperCase()} data={formattedPlayerTrends} fill="#82ca9d" />
+                        <Scatter name={statType.toUpperCase()} data={formattedPlayerTrends} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
                 </div>
             )}
