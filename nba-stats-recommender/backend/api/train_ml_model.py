@@ -2,7 +2,7 @@ import os
 import pandas as pd
 import joblib
 import logging
-from sklearn.model_selection import train_test_split, RandomizedSearchCV
+from sklearn.model_selection import train_test_split, GridSearchCV
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
 
@@ -83,21 +83,18 @@ def train_ml_model():
             )
             
             # Train model
-            #model = RandomForestRegressor(n_estimators=200, max_depth=10, random_state=42)
             rf = RandomForestRegressor(random_state=42)
-            random_search = RandomizedSearchCV(
+            grid_search = GridSearchCV(
                 estimator=rf, 
-                param_distributions=param_distributions,
-                n_iter = 50,
+                param_grid=param_distributions,  # Note the change to param_grid
                 cv=3,
                 verbose=2,
-                random_state=42,
                 n_jobs=-1
             )
-            random_search.fit(X_train, y_train)
+            grid_search.fit(X_train, y_train)
 
-            best_model = random_search.best_estimator_
-            logger.info("Best parameters for %s model: %s", stat, random_search.best_params_)
+            best_model = grid_search.best_estimator_
+            logger.info("Best parameters for %s model: %s", stat, grid_search.best_params_)
             
             # Save model
             joblib.dump(best_model, model_file)
