@@ -27,8 +27,8 @@ const PredictionForm = () => {
     const [showCharts, setShowCharts] = useState(false);
     const [playerTrends, setPlayerTrends] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    // const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -302,11 +302,11 @@ const PredictionForm = () => {
             )}
 
             {/* Scatter Chart for Trends */}
-            <div className="graph-container"></div>
             {showCharts && prediction?.games?.length > 0 && (
                 <div>
+                    <div className="chart">
                     <h3>{prediction.player} Performance Against {prediction.team}</h3>
-                    <ScatterChart width={800} height={400}>
+                    <ScatterChart width={600} height={300}>
                         <CartesianGrid />
                         <XAxis dataKey="GAME_DATE" />
                         <YAxis dataKey={statTypeMapping[statType]}  />
@@ -314,12 +314,10 @@ const PredictionForm = () => {
                         <Legend />
                         <Scatter name={statType.toUpperCase()} data={formattedPredictionGames} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
-                </div>
-            )}
-                {playerTrends.length > 0 && (
-                <div>
+                    </div>
+                    <div className="chart">
                     <h3>{prediction.player}'s Overall Player Trend</h3>
-                    <ScatterChart width={800} height={400}>
+                    <ScatterChart width={600} height={300}>
                         <CartesianGrid />
                         <XAxis dataKey="GAME_DATE" />
                         <YAxis dataKey={statTypeMapping[statType]} />
@@ -327,8 +325,9 @@ const PredictionForm = () => {
                         <Legend />
                         <Scatter name={statType.toUpperCase()} data={formattedPlayerTrends} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
+                    </div>
                 </div>
-            )}
+                )}
             {/* Display Error Message */}
             {errorMessage && (
                 <div style={{ color: "red", marginTop: "20px" }}>
