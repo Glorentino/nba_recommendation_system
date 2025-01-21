@@ -170,7 +170,7 @@ const PredictionForm = () => {
                 />
 
                 {/* Team Dropdown with Search */}
-                <p>Against Which Team:</p>
+                <p>Which Team Will The Player Go Against?</p>
                 <Select
                     options={filteredTeams}
                     onChange={(selectedOption) => setTeamName(selectedOption.value)}
@@ -214,7 +214,7 @@ const PredictionForm = () => {
                             checked={fetchRecommendations}
                             onChange={(e) => setFetchRecommendations(e.target.checked)}
                         />
-                        Show Top 5 Similar Players
+                        Show The 5 Top Similar Players
                     </label>
                 </div>
                 <button type="submit" disabled={loading}>
@@ -302,6 +302,7 @@ const PredictionForm = () => {
             )}
 
             {/* Scatter Chart for Trends */}
+            <div className="graph-container"></div>
             {showCharts && prediction?.games?.length > 0 && (
                 <div>
                     <h3>{prediction.player} Performance Against {prediction.team}</h3>
