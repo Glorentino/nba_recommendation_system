@@ -27,8 +27,8 @@ const PredictionForm = () => {
     const [showCharts, setShowCharts] = useState(false);
     const [playerTrends, setPlayerTrends] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    // const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -141,12 +141,13 @@ const PredictionForm = () => {
     };
 
     return (
-        <div>
-            <div>
-                <h2>Player Performance Prediction</h2>
-            </div>
-            
-            <form onSubmit={handleSubmit} >
+        <div >
+
+            <form className="form-container" onSubmit={handleSubmit} >
+
+                <div >
+                    <h2 className="form-title">Player Performance Prediction</h2>
+                </div>
                 {/* Player Dropdown with Search */}
                 <p>Select A Player:</p>
                 
@@ -199,6 +200,7 @@ const PredictionForm = () => {
                     onChange={(e) => setThreshold(e.target.value)}
                     min="1"
                     required
+                    
                 />
                 <select value={statType} onChange={(e) => setStatType(e.target.value)}>
                     <option value="points">Points</option>
@@ -207,31 +209,31 @@ const PredictionForm = () => {
                     <option value="assists">Assists</option>
                     <option value="steals">Steals</option>
                 </select>
-                <div>
+                <div class="checkbox-container">
                     <label>
                         <input
                             type="checkbox"
                             checked={fetchRecommendations}
-                            onChange={(e) => setFetchRecommendations(e.target.checked)}
+                            onChange={(e) => setFetchRecommendations(e.target.checked)}                            
                         />
                         Show The 5 Top Similar Players
                     </label>
                 </div>
-                <button type="submit" disabled={loading}>
+                <button type="submit" disabled={loading} class="predict-button" >
                     {loading ? "Predicting..." : "Predict"}
                 </button>
             </form>
-
+            <div style={{padding: "150px"}}>
             {/* Display Prediction */}
             {prediction && (
                 <div>
-                    <h2>Prediction Results</h2>
-                    <p>
+                    <h2 style={{color: "rgb(255, 255, 255)"}}> Prediction Results</h2>
+                    <p style={{color: "rgb(255, 255, 255)"}}>
                         {prediction.player} has a {prediction.likelihood} chance of exceeding{" "}
                         {threshold} {statType} against {prediction.team}.
                     </p>
 
-                    <h3>Game Logs (Against {teamName})</h3>
+                    <h3 className="h3-table">Game Logs (Against {teamName})</h3>
                     <table border="1" style={{ marginTop: "20px" }}>
                         <thead>
                             <tr>
@@ -259,7 +261,7 @@ const PredictionForm = () => {
                         </tbody>
                     </table>
 
-                    <h3>Last 5 Recent Games</h3>
+                    <h3 className="h3-table">Last 5 Recent Games</h3>
                     <table border="1" style={{ marginTop: "20px" }}>
                         <thead>
                             <tr>
@@ -290,14 +292,16 @@ const PredictionForm = () => {
             )}
             {recommendations.length > 0 && (
                 <div>
-                    <h3>Top 5 Similar Players</h3>
-                    <ul>
+                    <h3 className="h3-table">Top 5 Similar Players</h3>
+                    <table border="1" style={{ marginTop: "20px" }}>
+                    <tbody>
                         {recommendations.map((rec, index) => (
-                            <li key={index}>
-                                {rec.player_name}: {rec.likelihood.toFixed(2)}%
-                            </li>
+                            <tr key={index}>
+                                <td>{rec.player_name}: {rec.likelihood.toFixed(2)}%</td>
+                            </tr>
                         ))}
-                    </ul>
+                    </tbody>
+                    </table>
                 </div>
             )}
 
@@ -335,6 +339,7 @@ const PredictionForm = () => {
                     <p>{errorMessage}</p>
                 </div>
             )}
+            </div>
         </div>
     );
 };
