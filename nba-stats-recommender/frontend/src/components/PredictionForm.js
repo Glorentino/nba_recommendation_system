@@ -8,6 +8,7 @@ import {
     CartesianGrid,
     Tooltip,
     Legend,
+    ResponsiveContainer,
 } from "recharts";
 import "./PredictionForm.css";
 
@@ -27,8 +28,8 @@ const PredictionForm = () => {
     const [showCharts, setShowCharts] = useState(false);
     const [playerTrends, setPlayerTrends] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    // const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -223,7 +224,7 @@ const PredictionForm = () => {
                     {loading ? "Predicting..." : "Predict"}
                 </button>
             </form>
-            <div style={{padding: "150px"}}>
+            <div style={{padding: "5%"}}>
             {/* Display Prediction */}
             {prediction && (
                 <div>
@@ -260,7 +261,7 @@ const PredictionForm = () => {
                             ))}
                         </tbody>
                     </table>
-
+                    
                     <h3 className="h3-table">Last 5 Recent Games</h3>
                     <table border="1" style={{ marginTop: "20px" }}>
                         <thead>
@@ -307,9 +308,11 @@ const PredictionForm = () => {
 
             {/* Scatter Chart for Trends */}
             {showCharts && prediction?.games?.length > 0 && (
-                <div>
+                <div className="chart-container">
+                    
                     <div className="chart">
                     <h3>{prediction.player} Performance Against {prediction.team}</h3>
+                    <ResponsiveContainer width="100%" height={400}>
                     <ScatterChart width={600} height={300}>
                         <CartesianGrid />
                         <XAxis dataKey="GAME_DATE" />
@@ -318,9 +321,13 @@ const PredictionForm = () => {
                         <Legend />
                         <Scatter name={statType.toUpperCase()} data={formattedPredictionGames} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
+                    </ResponsiveContainer>
                     </div>
+                    
+                    
                     <div className="chart">
                     <h3>{prediction.player}'s Overall Player Trend</h3>
+                    <ResponsiveContainer width="100%" height={400}>
                     <ScatterChart width={600} height={300}>
                         <CartesianGrid />
                         <XAxis dataKey="GAME_DATE" />
@@ -329,7 +336,9 @@ const PredictionForm = () => {
                         <Legend />
                         <Scatter name={statType.toUpperCase()} data={formattedPlayerTrends} fill="rgb(97, 126, 179)" />
                     </ScatterChart>
+                    </ResponsiveContainer>
                     </div>
+                    
                 </div>
                 )}
             {/* Display Error Message */}
