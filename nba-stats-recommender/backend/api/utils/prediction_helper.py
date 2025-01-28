@@ -16,7 +16,8 @@ def stat_column_map(stat_type):
     "rebounds": "REB",
     "assists": "AST",
     "blocks": "BLK",
-    "steals": "STL"
+    "steals": "STL",
+    "fg3m" : "FG3M"
     }
     return STAT_COLUMN_MAP[stat_type]
 

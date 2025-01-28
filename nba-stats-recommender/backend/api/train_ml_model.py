@@ -20,10 +20,11 @@ MODEL_FILES = {
     "blocks": os.path.join(BASE_DIR, "ml_model_blocks.pkl"),
     "assists": os.path.join(BASE_DIR, "ml_model_assists.pkl"),
     "steals": os.path.join(BASE_DIR, "ml_model_steals.pkl"),
+    "fg3m": os.path.join(BASE_DIR, "ml_model_fg3m.pkl"),
 }
 
-REQUIRED_COLUMNS = ["PTS", "REB", "AST", "BLK", "STL",
-                    "POINTS_THRESHOLD", "REBOUNDS_THRESHOLD", "BLOCKS_THRESHOLD", "ASSISTS_THRESHOLD", "STEALS_THRESHOLD"]
+REQUIRED_COLUMNS = ["PTS", "FG3M","REB", "AST", "BLK", "STL",
+                    "POINTS_THRESHOLD","FG3M_THRESHOLD", "REBOUNDS_THRESHOLD", "BLOCKS_THRESHOLD", "ASSISTS_THRESHOLD", "STEALS_THRESHOLD" ]
 
 
 def validate_columns(data, required_columns):
@@ -72,7 +73,7 @@ def train_ml_model():
         try:
             labels = data[stat_col]
             # Dynamically determine feature columns
-            feature_columns = ["PTS", "REB", "AST", "BLK", "STL"]  # Add or modify features as needed
+            feature_columns = ["PTS", "FG3M", "REB", "AST", "BLK", "STL"]  # Add or modify features as needed
             features = data[feature_columns]
 
             # Split data

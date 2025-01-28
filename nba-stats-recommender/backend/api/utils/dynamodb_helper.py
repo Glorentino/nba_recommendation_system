@@ -84,15 +84,18 @@ class DDBQuery:
                 "TEAM_NAME": row["TEAM_NAME"],
                 "HOME_AWAY": row["HOME_AWAY"],
                 "POINTS_THRESHOLD": int(row["POINTS_THRESHOLD"]),
+                "FG3M_THRESHOLD": int(row["FG3M_THRESHOLD"]),
                 "REBOUNDS_THRESHOLD": int(row["REBOUNDS_THRESHOLD"]),
                 "BLOCKS_THRESHOLD": int(row["BLOCKS_THRESHOLD"]),
                 "ASSISTS_THRESHOLD": int(row["ASSISTS_THRESHOLD"]),
                 "STEALS_THRESHOLD": int(row["STEALS_THRESHOLD"]),
                 "ROLLING_PTS_AVG": convert_to_decimal(row["ROLLING_PTS_AVG"]),
+                "ROLLING_FG3M_AVG": convert_to_decimal(row["ROLLING_FG3M_AVG"]),
                 "ROLLING_REB_AVG": convert_to_decimal(row["ROLLING_REB_AVG"]),
                 "ROLLING_BLK_AVG": convert_to_decimal(row["ROLLING_BLK_AVG"]),
                 "ROLLING_AST_AVG": convert_to_decimal(row["ROLLING_AST_AVG"]),
                 "ROLLING_STL_AVG": convert_to_decimal(row["ROLLING_STL_AVG"]),
+
             }
 
             # Include non-null values for additional fields

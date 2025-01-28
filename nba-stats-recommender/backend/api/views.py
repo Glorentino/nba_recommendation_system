@@ -25,6 +25,7 @@ model_paths = {
     "blocks": os.path.join(BASE_DIR, "ml_model_blocks.pkl"),
     "assists": os.path.join(BASE_DIR, "ml_model_assists.pkl"),
     "steals": os.path.join(BASE_DIR, "ml_model_steals.pkl"),
+    "fg3m": os.path.join(BASE_DIR, "ml_model_fg3m.pkl"),
 }
 
 models = {}
@@ -127,7 +128,7 @@ def player_trends(request, player_name):
         stats = stats.sort_values("GAME_DATE")
         
         # Select columns for trends
-        trends = stats[["GAME_DATE", "PTS", "REB", "AST", "BLK", "STL"]].to_dict(orient="records")
+        trends = stats[["GAME_DATE", "FG3M", "PTS", "REB", "AST", "BLK", "STL"]].to_dict(orient="records")
         logger.info("Fetched trends for player %s.", player_name)
         return Response({"player": player_name, "trends":trends}, status=status.HTTP_200_OK)
     except Exception as e:
@@ -159,6 +160,7 @@ def team_comparisons(request):
                     "average_assists": stats["AST"].mean(),
                     "average_blocks":stats["BLK"].mean(), 
                     "average_steals":stats["STL"].mean(),
+                    "average_3pointers":stats["FG3M"].mean(),
                 }
                 team_stats.append(avg_stats)
         logger.info("Team comparisons calculated for %d teams.", len(team_stats))
@@ -186,7 +188,7 @@ def player_averages_vs_opponents(request, player_name):
         
         # group by opponent (team) and calculate averages
         stats["Opponent"] = stats["MATCHUP"].str.extract(r'vs\. (\w+)|@ (\w+)', expand=True).bfill(axis=1)[0]
-        averages = stats.groupby("Opponent")[["PTS", "REB", "AST", "BLK", "STL"]].mean().reset_index()
+        averages = stats.groupby("Opponent")[["PTS","FG3M", "REB", "AST", "BLK", "STL"]].mean().reset_index()
         averages_dict = averages.to_dict(orient="records")
         
         logger.info("Calculated averages against opponents for player %s.", player_name)
@@ -296,4 +298,14 @@ def predict_steals(request, player_name, team_name, threshold):
         return Response(response, status=status_code)
     except Exception as e:
         logger.error("Error in predict_steals: %s", e)
+        return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
+    
+@api_view(["GET"])
+def predict_3pointers(request, player_name, team_name, threshold):
+    try:
+        logger.info("Predicting 3points for player %s against team %s with threshold %s.", player_name, team_name, threshold)
+        response, status_code = PredictionHelper._predict_stat(models["fg3m"], player_name, team_name, threshold, "fg3m")
+        return Response(response, status=status_code)
+    except Exception as e:
+        logger.error("Error in predict_fg3m: %s", e)
         return Response({"error": f"An error occurred: {str(e)}"}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

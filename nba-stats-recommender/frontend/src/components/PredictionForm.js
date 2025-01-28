@@ -28,8 +28,8 @@ const PredictionForm = () => {
     const [showCharts, setShowCharts] = useState(false);
     const [playerTrends, setPlayerTrends] = useState([]);
 
-    const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
-    // const API_BASE_URL = "http://127.0.0.1:8000/api";
+    // const API_BASE_URL = "https://dfpuypxamy.us-east-1.awsapprunner.com/api";
+    const API_BASE_URL = "http://127.0.0.1:8000/api";
 
     useEffect(() => {
         // Fetch players
@@ -88,6 +88,7 @@ const PredictionForm = () => {
             blocks: "predict-blocks",
             assists: "predict-assists",
             steals: "predict-steals",
+            fg3m: "predict-fg3m"
         };
 
         const endpoint = apiEndpointMap[statType];
@@ -139,6 +140,7 @@ const PredictionForm = () => {
         assists: "AST",
         blocks: "BLK",
         steals: "STL",
+        fg3m: "FG3M",
     };
 
     return (
@@ -205,6 +207,7 @@ const PredictionForm = () => {
                 />
                 <select value={statType} onChange={(e) => setStatType(e.target.value)}>
                     <option value="points">Points</option>
+                    <option value="fg3m">3PTS</option>
                     <option value="rebounds">Rebounds</option>
                     <option value="blocks">Blocks</option>
                     <option value="assists">Assists</option>
@@ -241,6 +244,7 @@ const PredictionForm = () => {
                                 <th>Game Date</th>
                                 <th>Matchup</th>
                                 <th>Points</th>
+                                <th>3PTS</th>
                                 <th>Rebounds</th>
                                 <th>Assists</th>
                                 <th>Blocks</th>
@@ -253,6 +257,7 @@ const PredictionForm = () => {
                                     <td>{game.GAME_DATE}</td>
                                     <td>{game.MATCHUP}</td>
                                     <td>{game.PTS}</td>
+                                    <td>{game.FG3M}</td>
                                     <td>{game.REB}</td>
                                     <td>{game.AST}</td>
                                     <td>{game.BLK}</td>
@@ -269,6 +274,7 @@ const PredictionForm = () => {
                                 <th>Game Date</th>
                                 <th>Matchup</th>
                                 <th>Points</th>
+                                <th>3PTS</th>
                                 <th>Rebounds</th>
                                 <th>Assists</th>
                                 <th>Blocks</th>
@@ -281,6 +287,7 @@ const PredictionForm = () => {
                                     <td>{game.GAME_DATE}</td>
                                     <td>{game.MATCHUP}</td>
                                     <td>{game.PTS}</td>
+                                    <td>{game.FG3M}</td>
                                     <td>{game.REB}</td>
                                     <td>{game.AST}</td>
                                     <td>{game.BLK}</td>

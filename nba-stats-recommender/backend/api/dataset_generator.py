@@ -23,13 +23,14 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_FILE = os.path.join(BASE_DIR, "utils/player_data.csv")
 
 
-FEATURES = ["GAME_DATE", "MATCHUP", "PTS", "REB", "AST", "BLK","STL", "PLAYER_NAME", "HOME_AWAY"]
+FEATURES = ["GAME_DATE", "MATCHUP", "PTS", "FG3M", "REB", "AST", "BLK", "STL", "PLAYER_NAME", "HOME_AWAY"]
 THRESHOLD_COLUMNS = {
     "POINTS_THRESHOLD": ("PTS", 10),
     "REBOUNDS_THRESHOLD": ("REB", 5),
     "BLOCKS_THRESHOLD": ("BLK", 1),
     "ASSISTS_THRESHOLD": ("AST", 3),
     "STEALS_THRESHOLD": ("STL", 1),
+    "FG3M_THRESHOLD": ("FG3M", 1),
 }
 
 # Dynamic thresholds
@@ -39,6 +40,7 @@ DYNAMIC_THRESHOLDS = {
     "ROLLING_BLK_AVG": ("BLK", 5),
     "ROLLING_AST_AVG": ("AST", 5),
     "ROLLING_STL_AVG": ("STL", 5),
+    "ROLLING_FG3M_AVG": ("FG3M", 5),
 }
 
 def get_current_season():
@@ -97,7 +99,6 @@ def process_player_data(player, season):
                     gamelog[col] = gamelog[stat].rolling(window=window).mean().fillna(0)
                 else:
                     logging.warning(f"Missing column {stat} for player {player_name}. Rolling average not calculated.")
-
             return gamelog
         else:
             logging.warning(f"No data available for {player_name}.")
